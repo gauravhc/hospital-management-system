@@ -1,0 +1,65 @@
+
+> hds@0.1.0 build
+> next build
+
+   Γû▓ Next.js 16.0.10 (Turbopack)
+   - Environments: .env
+
+   Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 2 errors:
+./src/app/page.jsx:5:1
+Module not found: Can't resolve '@/components/home/Hero'
+  3 | import { c as _c } from "react/compiler-runtime";
+  4 | import { useState } from 'react';
+> 5 | import Hero from '@/components/home/Hero';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import Features from '@/components/home/Features';
+  7 | import AppointmentCTA from '@/components/home/AppointmentCTA';
+  8 | import SpecialityCard from '@/components/specialities/SpecialityCard';
+
+Import map: aliased to relative './src/components/home/Hero' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.jsx [Client Component Browser]
+    ./src/app/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.jsx [Client Component SSR]
+    ./src/app/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/page.jsx:3:1
+Module not found: Can't resolve '@/components/home/Hero'
+  1 | 'use client';
+  2 | import { useState } from 'react';
+> 3 | import Hero from '@/components/home/Hero';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import Features from '@/components/home/Features';
+  5 | import AppointmentCTA from '@/components/home/AppointmentCTA';
+  6 | import SpecialityCard from '@/components/specialities/SpecialityCard';
+
+Import map: aliased to relative './src/components/home/Hero' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.jsx [Client Component Browser]
+    ./src/app/page.jsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.jsx [Client Component SSR]
+    ./src/app/page.jsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/app/page.jsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/page.jsx:3:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

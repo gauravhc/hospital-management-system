@@ -1,0 +1,29 @@
+[
+  {
+    "patientId": "p1",
+    "patientName": "John Doe",
+    "doctorId": "d1",
+    "doctorName": "Dr. Smith",
+    "date": "2026-02-03",
+    "time": "10:00 AM",
+    "status": "Scheduled",
+    "type": "General Checkup",
+    "notes": "Regular checkup",
+    "_id": "1770116807813",
+    "createdAt": "2026-02-03T11:06:47.813Z"
+  },
+  {
+    "patientId": "p2",
+    "patientName": "Alice Johnson",
+    "doctorId": "d1",
+    "doctorName": "Dr. Smith",
+    "date": "2026-02-04",
+    "time": "11:00 AM",
+    "status": "Completed",
+    "type": "Consultation",
+    "notes": "Headache",
+    "_id": "1770116807814",
+    "createdAt": "2026-02-03T11:06:47.814Z",
+    "updatedAt": "2026-02-06T10:23:32.873Z"
+  }
+]

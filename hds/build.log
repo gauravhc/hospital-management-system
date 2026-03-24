@@ -1,0 +1,123 @@
+
+> hds@0.1.0 build
+> next build
+
+   Γû▓ Next.js 16.0.10 (Turbopack)
+   - Environments: .env
+
+   Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 4 errors:
+./src/components/dashboard/featureddoctor.jsx:4:1
+Module not found: Can't resolve '../src/data/doctorData'
+  2 | import Link from 'next/link'
+  3 | import DoctorCard from './DoctorCard'
+> 4 | import doctors from '../src/data/doctorData'
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 |
+  6 | export default function FeaturedDoctors(){
+  7 |   const featured = doctors.slice(0,3)
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component Browser]
+    ./src/app/page.js [Client Component Browser]
+    ./src/app/page.js [Server Component]
+
+  Client Component SSR:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component SSR]
+    ./src/app/page.js [Client Component SSR]
+    ./src/app/page.js [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/dashboard/featureddoctor.jsx:6:1
+Module not found: Can't resolve '../src/data/doctorData'
+  4 | import Link from 'next/link';
+  5 | import DoctorCard from './DoctorCard';
+> 6 | import doctors from '../src/data/doctorData';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 | export default function FeaturedDoctors() {
+  8 |   const $ = _c(4);
+  9 |   let t0;
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component Browser]
+    ./src/app/page.js [Client Component Browser]
+    ./src/app/page.js [Server Component]
+
+  Client Component SSR:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component SSR]
+    ./src/app/page.js [Client Component SSR]
+    ./src/app/page.js [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/dashboard/featureddoctor.jsx:3:1
+Module not found: Can't resolve './DoctorCard'
+  1 | 'use client'
+  2 | import Link from 'next/link'
+> 3 | import DoctorCard from './DoctorCard'
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import doctors from '../src/data/doctorData'
+  5 |
+  6 | export default function FeaturedDoctors(){
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component Browser]
+    ./src/app/page.js [Client Component Browser]
+    ./src/app/page.js [Server Component]
+
+  Client Component SSR:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component SSR]
+    ./src/app/page.js [Client Component SSR]
+    ./src/app/page.js [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/dashboard/featureddoctor.jsx:5:1
+Module not found: Can't resolve './DoctorCard'
+  3 | import { c as _c } from "react/compiler-runtime";
+  4 | import Link from 'next/link';
+> 5 | import DoctorCard from './DoctorCard';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import doctors from '../src/data/doctorData';
+  7 | export default function FeaturedDoctors() {
+  8 |   const $ = _c(4);
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component Browser]
+    ./src/app/page.js [Client Component Browser]
+    ./src/app/page.js [Server Component]
+
+  Client Component SSR:
+    ./src/components/dashboard/featureddoctor.jsx [Client Component SSR]
+    ./src/app/page.js [Client Component SSR]
+    ./src/app/page.js [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/components/dashboard/featureddoctor.jsx:4:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/dashboard/featureddoctor.jsx:6:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/dashboard/featureddoctor.jsx:3:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/dashboard/featureddoctor.jsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

@@ -1,0 +1,66 @@
+[
+  {
+    "email": "hospitaladmin@hds.com",
+    "password": "$2b$10$oIxUaBzpHV6MgcEhfMcJM.YU5vkebcyNyfxNaODFfMgGlN8WrwTBS",
+    "role": "admin",
+    "name": "Admin",
+    "_id": "1767595827157",
+    "createdAt": "2026-01-05T06:50:27.157Z"
+  },
+  {
+    "email": "nurse@hds.com",
+    "password": "$2b$10$i8rfoBskFm25fc9csT6LOO0ApcDQos1Amw0Kf8jplBlpO/ftqPOFu",
+    "role": "nurse",
+    "name": "Nurse",
+    "_id": "1767596361230",
+    "createdAt": "2026-01-05T06:59:21.230Z"
+  },
+  {
+    "email": "patient@hds.com",
+    "password": "$2b$10$rLDU/L2gzGsCRtt81tNNMO6LM4tO/RTQuUMg.xQI5WQoMXhb3f7MS",
+    "role": "patient",
+    "name": "Patient",
+    "_id": "1769502962288",
+    "createdAt": "2026-01-27T08:36:02.288Z"
+  },
+  {
+    "email": "doctor@hds.com",
+    "password": "$2b$10$8qJS0eTsZMchKIDYuMEeZ.YQYnG7NmftOLf9gjlf/B4AOTnIeeUJe",
+    "role": "doctor",
+    "name": "Doctor",
+    "_id": "1769503017691",
+    "createdAt": "2026-01-27T08:36:57.691Z"
+  },
+  {
+    "email": "lab@hds.com",
+    "password": "$2b$10$5pMX.4MuIe27R733pp.Gme9HZ0ID/MgbDorFr6GUsLHaF893.egiW",
+    "role": "lab",
+    "name": "Lab",
+    "_id": "1769503107066",
+    "createdAt": "2026-01-27T08:38:27.066Z"
+  },
+  {
+    "email": "register@hds.com",
+    "password": "$2b$10$F/jM6rPtmJUzNqApQnpvP.y2kI5l2y2SQQo5I9Wr1/vrvQJaz5fqK",
+    "role": "register",
+    "name": "Register",
+    "_id": "1769503142086",
+    "createdAt": "2026-01-27T08:39:02.086Z"
+  },
+  {
+    "email": "pharmacy@hds.com",
+    "password": "$2b$10$PfPXAn3ujNPWYQFhybRpIu/hRghNpP7YbdSwjzUFPQpfYUpbjSt8q",
+    "role": "pharmacy",
+    "name": "Pharmacy",
+    "_id": "1769503176127",
+    "createdAt": "2026-01-27T08:39:36.127Z"
+  },
+  {
+    "email": "inventory@hds.com",
+    "password": "$2b$10$IQ7zdt0b/IPhGhic.sefXODREj5.v87.DM3KSgHRCV7EniYhpoUe2",
+    "role": "inventory",
+    "name": "Inventory",
+    "_id": "1769503199943",
+    "createdAt": "2026-01-27T08:39:59.943Z"
+  }
+]
