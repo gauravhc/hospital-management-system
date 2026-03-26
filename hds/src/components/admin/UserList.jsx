@@ -12,10 +12,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5
 
 const apiLocal = async (url, { method = "GET", body } = {}) => {
     const finalUrl = String(url || "").startsWith("http") ? url : `${API_BASE_URL}${url}`;
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (body) headers["Content-Type"] = "application/json";
+
     const res = await fetch(finalUrl, {
         method,
         credentials: "include",
-        headers: body ? { "Content-Type": "application/json" } : undefined,
+        headers: Object.keys(headers).length ? headers : undefined,
         body: body ? JSON.stringify(body) : undefined,
     });
     const json = await res.json().catch(() => ({}));

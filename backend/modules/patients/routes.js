@@ -50,12 +50,12 @@ router.get("/appointments", roleMiddleware("patient"), asyncHandler(controller.l
 router.get("/bills", roleMiddleware("patient"), asyncHandler(controller.listBills));
 router.get("/lab-reports", roleMiddleware("patient"), asyncHandler(controller.listLabReports));
 
-router.get("/:id", hospitalScope, asyncHandler(controller.getById));
+router.get("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.getById));
 router.put("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor"), asyncHandler(controller.update));
 router.delete("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin"), asyncHandler(controller.remove));
-router.get("/:id/appointments", hospitalScope, asyncHandler(controller.appointments));
-router.get("/:id/lab-reports", hospitalScope, asyncHandler(controller.labReports));
-router.get("/:id/bills", hospitalScope, asyncHandler(controller.bills));
-router.get("/:id/documents", hospitalScope, asyncHandler(controller.documents));
+router.get("/:id/appointments", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.appointments));
+router.get("/:id/lab-reports", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.labReports));
+router.get("/:id/bills", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.bills));
+router.get("/:id/documents", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.documents));
 
 module.exports = router;

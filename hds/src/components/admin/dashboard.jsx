@@ -38,6 +38,89 @@ export default function HRDashboard() {
   const [searchError, setSearchError] = useState("");
   const [loadingSearch, setLoadingSearch] = useState(false);
 
+  const isPatientResult = String(searchResult?.entityType || "").toLowerCase() === "patient";
+
+  const fallbackAvatarSrc = (() => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+        <rect width="200" height="200" fill="#e5e7eb"/>
+        <text x="100" y="104" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#6b7280">
+          No Image
+        </text>
+      </svg>
+    `;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  })();
+
+  const resolveImageSrc = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return fallbackAvatarSrc;
+
+    const normalized = raw.replace(/\\/g, "/");
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+
+    // If backend already returned a full /uploads path, keep it intact.
+    if (normalized.startsWith("/uploads/")) return `${API_URL}${normalized}`;
+    if (normalized.startsWith("uploads/")) return `${API_URL}/${normalized}`;
+
+    // Other absolute paths from the backend should be respected.
+    if (normalized.startsWith("/")) return `${API_URL}${normalized}`;
+
+    // Common backend upload refs may come as:
+    // - "/uploads/profile_images/x.jpg"
+    // - "uploads/profile_images/x.jpg"
+    // - "profile_images/x.jpg"
+    // - "x.jpg" (legacy)
+    const cleaned = normalized.replace(/^\/+/, "").replace(/^uploads\//i, "");
+
+    if (/^(profile_images|patients|patient_images|avatars|patient_documents|staff_documents)\//i.test(cleaned)) {
+      return `${API_URL}/uploads/${cleaned}`;
+    }
+
+    if (!cleaned.includes("/") && /\.[a-z0-9]+$/i.test(cleaned)) {
+      return `${API_URL}/uploads/profile_images/${cleaned}`;
+    }
+
+    return `${API_URL}/${cleaned}`;
+  };
+
+  const normalizeEmployee = (user) => {
+    if (!user || typeof user !== "object") return null;
+    const firstName = user.first_name || user.firstName || "";
+    const lastName = user.last_name || user.lastName || "";
+    const name = user.name || `${firstName} ${lastName}`.trim();
+
+    return {
+      ...user,
+      entityType: user.entityType || "employee",
+      name,
+      role: user.role || user.designation || user.user_type || "staff",
+      employee_id: user.employee_id || user.employeeId || user.id || "",
+      mobile: user.mobile || user.phone || "",
+      photo: user.photo || user.profile_image_url || user.profile_image || user.avatar_url || "",
+    };
+  };
+
+  const normalizePatient = (patient) => {
+    if (!patient || typeof patient !== "object") return null;
+    return {
+      ...patient,
+      entityType: "patient",
+      role: "patient",
+      name: patient.name || patient.full_name || patient.fullName || "",
+      patient_id: patient.patient_id || patient.patientId || patient.id || "",
+      mobile: patient.phone || patient.mobile || "",
+      dob: patient.dob || patient.date_of_birth || patient.dateOfBirth || null,
+      photo:
+        patient.profile_image_url ||
+        patient.profileImageUrl ||
+        patient.profile_image ||
+        patient.avatar_url ||
+        patient.photo_url ||
+        "",
+    };
+  };
+
   const [stats, setStats] = useState({
     total: {},
     present: {},
@@ -195,15 +278,45 @@ export default function HRDashboard() {
     setSearchResult(null);
 
     if (!search.trim()) {
-      setSearchError("Please enter an employee ID or name");
+      setSearchError("Please enter a patient ID, employee ID, or name");
       return;
     }
 
     setLoadingSearch(true);
 
     try {
-      const data = await apiGet("/api/hr/search", { q: search });
-      setSearchResult(data.user);
+      const q = search.trim();
+      const isNumeric = /^\d+$/.test(q);
+
+      if (isNumeric) {
+        try {
+          const patientRes = await apiGet(`/api/patients/${q}`);
+          const patient = normalizePatient(patientRes?.data || patientRes?.patient || patientRes);
+          if (patient) {
+            setSearchResult(patient);
+            return;
+          }
+        } catch (patientErr) {
+          // If patient lookup fails, fall back to employee search below.
+          if (patientErr?.response?.status && patientErr.response.status !== 404) {
+            throw patientErr;
+          }
+        }
+      }
+
+      const data = await apiGet("/api/hr/search", { q });
+      const candidate =
+        data?.user ||
+        (Array.isArray(data?.data) ? data.data[0] : null) ||
+        (Array.isArray(data) ? data[0] : null);
+
+      const employee = normalizeEmployee(candidate);
+      if (!employee) {
+        setSearchError("No matching record found");
+        return;
+      }
+
+      setSearchResult(employee);
     } catch (err) {
       setSearchError(err?.message || "Server connection failed");
     } finally {
@@ -470,7 +583,7 @@ export default function HRDashboard() {
             <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
               <div className="bg-gray-50 px-8 py-4 border-b border-gray-100 flex justify-between items-center">
                 <h3 className="font-bold text-lg text-gray-700 flex items-center gap-2">
-                  <Users size={20} className="text-blue-600" /> Employee Profile
+                  <Users size={20} className="text-blue-600" /> {isPatientResult ? "Patient Profile" : "Employee Profile"}
                 </h3>
                 <button
                   onClick={() => { setSearchResult(null); setSearch(""); }}
@@ -485,14 +598,14 @@ export default function HRDashboard() {
                 <div className="flex flex-col items-center">
                   <div className="w-48 h-48 rounded-2xl overflow-hidden shadow-lg border-4 border-white mb-6 bg-gray-200">
                     <img
-                      src={searchResult.photo ? `${API_URL}${searchResult.photo}` : "https://via.placeholder.com/200?text=No+Image"}
+                      src={resolveImageSrc(searchResult.photo)}
                       alt="Profile"
                       className="w-full h-full object-cover"
-                      onError={(e) => { e.target.src = "https://via.placeholder.com/200?text=No+Image"; }}
+                      onError={(e) => { e.target.src = fallbackAvatarSrc; }}
                     />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">{searchResult.name}</h2>
-                  <p className="text-blue-600 font-medium">{searchResult.role}</p>
+                  <p className="text-blue-600 font-medium">{isPatientResult ? "patient" : searchResult.role}</p>
                 </div>
 
                 {/* Details */}
@@ -500,49 +613,67 @@ export default function HRDashboard() {
                   <div className="col-span-2 mb-4">
                     <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Personal Information</h4>
                   </div>
-                  <InfoRow label="Employee ID" value={searchResult.employee_id} />
-                  <InfoRow label="Department" value={searchResult.department} />
-                  <InfoRow label="Email" value={searchResult.email} />
-                  <InfoRow label="Mobile" value={searchResult.mobile} />
+                  {isPatientResult ? (
+                    <>
+                      <InfoRow label="Patient ID" value={searchResult.patient_id} />
+                      <InfoRow label="Gender" value={searchResult.gender} />
+                      <InfoRow label="Email" value={searchResult.email} />
+                      <InfoRow label="Mobile" value={searchResult.mobile} />
+                      <InfoRow label="DOB" value={searchResult.dob} />
+                      <InfoRow label="Blood Group" value={searchResult.blood_group} />
+                      <div className="col-span-2 mt-2">
+                        <InfoRow label="Address" value={searchResult.address} />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <InfoRow label="Employee ID" value={searchResult.employee_id} />
+                      <InfoRow label="Department" value={searchResult.department} />
+                      <InfoRow label="Email" value={searchResult.email} />
+                      <InfoRow label="Mobile" value={searchResult.mobile} />
 
-                  <div className="col-span-2 mt-6 mb-4">
-                    <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Financial Details</h4>
-                  </div>
-                  <InfoRow label="Bank Name" value={searchResult.bank_name} />
-                  <InfoRow label="Account Number" value={searchResult.account_number} />
-                  <InfoRow label="IFSC Code" value={searchResult.ifsc_code} />
+                      <div className="col-span-2 mt-6 mb-4">
+                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Financial Details</h4>
+                      </div>
+                      <InfoRow label="Bank Name" value={searchResult.bank_name} />
+                      <InfoRow label="Account Number" value={searchResult.account_number} />
+                      <InfoRow label="IFSC Code" value={searchResult.ifsc_code} />
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Actions Footer */}
-              <div className="bg-gray-50 px-8 py-6 border-t border-gray-200 flex flex-wrap items-center justify-between gap-6">
+              {!isPatientResult && (
+                <div className="bg-gray-50 px-8 py-6 border-t border-gray-200 flex flex-wrap items-center justify-between gap-6">
 
-                {/* ID Card Hidden Render */}
-                <div className="hidden">
-                  <div id="idCard">
-                    <IDCard employee={searchResult} />
+                  {/* ID Card Hidden Render */}
+                  <div className="hidden">
+                    <div id="idCard">
+                      <IDCard employee={searchResult} />
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-gray-500 italic flex-1">
+                    * Actions generated here are logged for audit purposes.
+                  </p>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={printIDCard}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                    >
+                      <Printer size={18} /> Print Card
+                    </button>
+                    <button
+                      onClick={downloadPDF}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-200"
+                    >
+                      <Download size={18} /> Download ID
+                    </button>
                   </div>
                 </div>
-
-                <p className="text-sm text-gray-500 italic flex-1">
-                  * Actions generated here are logged for audit purposes.
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={printIDCard}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
-                  >
-                    <Printer size={18} /> Print Card
-                  </button>
-                  <button
-                    onClick={downloadPDF}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-200"
-                  >
-                    <Download size={18} /> Download ID
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -23,13 +23,39 @@ const buildProfileResponse = (patient) => {
       patient?.photo_url ||
       ""
   );
-  const imageUrl = profileImage
-    ? /^https?:\/\//i.test(profileImage)
-      ? profileImage
-      : profileImage.includes("/")
-      ? `/uploads/${profileImage}`
-      : `/uploads/profile_images/${profileImage}`
-    : "";
+
+  const resolveUploadUrl = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return { url: "", ref: "" };
+    if (/^https?:\/\//i.test(raw)) return { url: raw, ref: raw };
+
+    let cleaned = raw.replace(/^\/+/, "");
+    cleaned = cleaned.replace(/^uploads\//, "");
+
+    // If already includes a folder, treat it as relative to /uploads
+    if (cleaned.includes("/")) {
+      return { url: `/uploads/${cleaned}`, ref: cleaned };
+    }
+
+    // Otherwise, try common patient image folders to avoid broken legacy paths.
+    const uploadsRoot = path.join(__dirname, "..", "..", "uploads");
+    const candidateDirs = ["profile_images", "patients", "patient_images", "avatars"];
+
+    for (const dir of candidateDirs) {
+      try {
+        if (fs.existsSync(path.join(uploadsRoot, dir, cleaned))) {
+          return { url: `/uploads/${dir}/${cleaned}`, ref: `${dir}/${cleaned}` };
+        }
+      } catch (err) {
+        // ignore fs errors and fall back
+      }
+    }
+
+    // Default location
+    return { url: `/uploads/profile_images/${cleaned}`, ref: `profile_images/${cleaned}` };
+  };
+
+  const resolved = resolveUploadUrl(profileImage);
 
   return {
   id: patient?.id,
@@ -46,8 +72,8 @@ const buildProfileResponse = (patient) => {
   country: patient?.country || "",
   pincode: patient?.pincode || "",
   address: patient?.address || "",
-  profile_image: profileImage || "",
-  profile_image_url: imageUrl,
+  profile_image: resolved.ref || profileImage || "",
+  profile_image_url: resolved.url || "",
 };
 };
 
@@ -120,8 +146,26 @@ async function create(req, res) { await service.create(req.body, getScopedHospit
 async function getById(req, res) {
   const row = await service.getById(req.params.id);
   if (!row) return res.status(404).json({ success: false, message: "Patient not found" });
+
+  const actorRole = String(req.user?.role || "").toLowerCase().trim();
+  const patientHospitalId = row?.hospital_id ?? row?.hospitalId ?? null;
+
+  // Ensure non-super-admin actors cannot fetch patients from other hospitals.
+  // Use 404 to avoid leaking existence across hospitals.
+  if (
+    actorRole &&
+    actorRole !== "super_admin" &&
+    patientHospitalId !== null &&
+    patientHospitalId !== undefined &&
+    String(patientHospitalId) !== String(req.user?.hospital_id)
+  ) {
+    return res.status(404).json({ success: false, message: "Patient not found" });
+  }
+
+  const profile = buildProfileResponse(row || {});
   const patient = {
     ...row,
+    ...profile,
     name: row.name || row.full_name,
     phone: row.phone || row.mobile,
     patient_id: row.patient_id || row.id,
