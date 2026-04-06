@@ -81,6 +81,7 @@ const ROLE_MENUS = {
                 { title: "Dashboard", href: "/admin", icon: <FaHome size={18} />, subtitle: "Overview" },
                 { title: "Manage Users", href: "/admin/users", icon: <FaUserMd size={18} />, subtitle: "Staff & Patients" },
                 { title: "Create User", href: "/admin/create", icon: <FaUserNurse size={18} />, subtitle: "Onboarding" },
+                { title: "Book Appointment", href: "/admin/book-appointment", icon: <FaCalendarAlt size={18} />, subtitle: "On Behalf" },
                 { title: "Settings", href: "/admin/settings", icon: <FaShieldAlt size={18} />, subtitle: "System" },
             ]
         }

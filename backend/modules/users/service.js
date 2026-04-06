@@ -53,16 +53,22 @@ async function listRoleUsers(table, roleLabel, scopedHospitalId, q) {
   const nameCol = firstExistingColumn(cols, ["full_name", "name"]);
   const emailCol = firstExistingColumn(cols, ["email"]);
   const phoneCol = firstExistingColumn(cols, ["phone", "mobile"]);
+  const firstNameCol = firstExistingColumn(cols, ["first_name", "firstname", "given_name"]);
+  const lastNameCol = firstExistingColumn(cols, ["last_name", "lastname", "surname", "family_name"]);
   const hospitalCol = firstExistingColumn(cols, ["hospital_id"]);
   const statusCol = firstExistingColumn(cols, ["status", "is_active"]);
   const roleCol = firstExistingColumn(cols, ["role"]);
 
-  if (!idCol || !emailCol) return [];
+  if (!idCol) return [];
 
   const select = [
     `\`${idCol}\` AS id`,
-    nameCol ? `\`${nameCol}\` AS name` : "NULL AS name",
-    `\`${emailCol}\` AS email`,
+    nameCol
+      ? `\`${nameCol}\` AS name`
+      : firstNameCol || lastNameCol
+        ? `TRIM(CONCAT_WS(' ', ${firstNameCol ? `\`${firstNameCol}\`` : "''"}, ${lastNameCol ? `\`${lastNameCol}\`` : "''"})) AS name`
+        : "NULL AS name",
+    emailCol ? `\`${emailCol}\` AS email` : "NULL AS email",
     phoneCol ? `\`${phoneCol}\` AS phone` : "NULL AS phone",
     hospitalCol ? `\`${hospitalCol}\` AS hospital_id` : "NULL AS hospital_id",
     statusCol
@@ -77,7 +83,12 @@ async function listRoleUsers(table, roleLabel, scopedHospitalId, q) {
   const params = [];
 
   if (scopedHospitalId !== null && scopedHospitalId !== undefined && hospitalCol) {
-    whereParts.push(`\`${hospitalCol}\` = ?`);
+    if (table === "patients") {
+      // Allow searching legacy/unassigned patients that don't yet have a hospital_id.
+      whereParts.push(`(\`${hospitalCol}\` = ? OR \`${hospitalCol}\` IS NULL)`);
+    } else {
+      whereParts.push(`\`${hospitalCol}\` = ?`);
+    }
     params.push(scopedHospitalId);
   }
 
@@ -87,13 +98,37 @@ async function listRoleUsers(table, roleLabel, scopedHospitalId, q) {
   }
 
   if (q) {
-    const search = `%${String(q).toLowerCase()}%`;
+    const raw = String(q).trim();
+    const search = `%${raw.toLowerCase()}%`;
+    const orParts = [];
+
     if (nameCol) {
-      whereParts.push(`LOWER(\`${nameCol}\`) LIKE ?`);
+      orParts.push(`LOWER(\`${nameCol}\`) LIKE ?`);
       params.push(search);
-    } else {
-      whereParts.push(`LOWER(\`${emailCol}\`) LIKE ?`);
+    } else if (firstNameCol || lastNameCol) {
+      const firstExpr = firstNameCol ? `\`${firstNameCol}\`` : "''";
+      const lastExpr = lastNameCol ? `\`${lastNameCol}\`` : "''";
+      orParts.push(`LOWER(TRIM(CONCAT_WS(' ', ${firstExpr}, ${lastExpr}))) LIKE ?`);
       params.push(search);
+    }
+
+    if (emailCol) {
+      orParts.push(`LOWER(\`${emailCol}\`) LIKE ?`);
+      params.push(search);
+    }
+
+    if (phoneCol) {
+      orParts.push(`LOWER(CAST(\`${phoneCol}\` AS CHAR)) LIKE ?`);
+      params.push(search);
+    }
+
+    if (/^\\d+$/.test(raw)) {
+      orParts.push(`\`${idCol}\` = ?`);
+      params.push(Number(raw));
+    }
+
+    if (orParts.length) {
+      whereParts.push(`(${orParts.join(" OR ")})`);
     }
   }
 

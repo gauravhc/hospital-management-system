@@ -81,7 +81,16 @@ async function createPatientRequest(user, payload = {}) {
 
   const pickup_address = payload.pickup_address || payload.pickup_location || payload.pickup || null;
   const hospital_id = payload.hospital_id || payload.hospitalId || null;
-  const ambulance_type = payload.ambulance_type || payload.type || "Normal";
+  const rawType = payload.ambulance_type || payload.type || null;
+  const normalizedType = rawType
+    ? (() => {
+        const t = String(rawType).trim().toLowerCase();
+        if (t === "private") return "Private";
+        if (t === "108") return "108";
+        return String(rawType).trim() || null;
+      })()
+    : null;
+  const ambulance_type = normalizedType || "Private";
   const pickup_time = payload.pickup_time || payload.pickupTime || null;
   const contact_phone = payload.contact_phone || payload.phone || null;
 

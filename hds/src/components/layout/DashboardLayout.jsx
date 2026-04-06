@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import Sidebar from "@/components/sidebar/sidebar";
 import MobileTabNav from "@/components/layout/MobileTabNav";
+import { readStoredUser, subscribeToAuthChanges } from "@/lib/authStore";
 
 export default function DashboardLayout({ children, role, navItems }) {
-    const [username, setUsername] = useState("");
     const roleTitle =
         role === "admin"
             ? "Hospital Admin"
@@ -13,10 +13,16 @@ export default function DashboardLayout({ children, role, navItems }) {
                 ? "Super Admin"
                 : role.charAt(0).toUpperCase() + role.slice(1);
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem("username");
-        setUsername(storedUser || roleTitle);
-    }, [roleTitle]);
+    const user = useSyncExternalStore(
+        subscribeToAuthChanges,
+        readStoredUser,
+        () => null
+    );
+
+    const username = useMemo(() => {
+        const storedName = user?.username || user?.email || "";
+        return storedName || roleTitle;
+    }, [roleTitle, user?.email, user?.username]);
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">

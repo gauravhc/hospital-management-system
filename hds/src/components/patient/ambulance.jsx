@@ -4,15 +4,33 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Truck } from "lucide-react";
 import { apiGet, apiPost } from "@/services/api";
 
+const AMBULANCE_TYPES = ["Private", "108"];
+
+const computeAge = (dob) => {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const monthDiff = now.getMonth() - d.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < d.getDate())) age -= 1;
+  if (age < 0 || age > 130) return null;
+  return age;
+};
+
 const PatientAmbulancePage = () => {
   const [pickup, setPickup] = useState("");
   const [hospitals, setHospitals] = useState([]);
   const [hospitalId, setHospitalId] = useState("");
-  const [type, setType] = useState("Normal");
+  const [type, setType] = useState("Private");
   const [time, setTime] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const [latestRequest, setLatestRequest] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -50,8 +68,21 @@ const PatientAmbulancePage = () => {
     }
   };
 
+  const loadProfile = async () => {
+    try {
+      setProfileLoading(true);
+      const res = await apiGet("/api/patients/profile");
+      setProfile(res?.data || null);
+    } catch {
+      setProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadHospitals();
+    loadProfile();
     loadLatestRequest();
     const id = setInterval(loadLatestRequest, 5000);
     return () => clearInterval(id);
@@ -92,6 +123,9 @@ const PatientAmbulancePage = () => {
     }
   };
 
+  const patientName = String(profile?.name || "").trim();
+  const patientAge = computeAge(profile?.dob);
+
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">
       <main
@@ -119,6 +153,29 @@ const PatientAmbulancePage = () => {
                 {error}
               </div>
             ) : null}
+
+            <div className="mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Patient Details</p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm text-slate-600 mb-1">Patient Name</label>
+                  <input
+                    value={profileLoading ? "Loading..." : patientName || "--"}
+                    readOnly
+                    className="p-3 border rounded-xl w-full bg-white text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-600 mb-1">Age</label>
+                  <input
+                    value={profileLoading ? "Loading..." : patientAge !== null ? String(patientAge) : "--"}
+                    readOnly
+                    className="p-3 border rounded-xl w-full bg-white text-slate-800"
+                  />
+                </div>
+              </div>
+            </div>
+
             {latestRequest && (
               <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -158,6 +215,10 @@ const PatientAmbulancePage = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="mt-3 text-sm text-slate-700">
+                  <span className="font-semibold">Type:</span> {latestRequest?.ambulance_type || "--"}
+                </div>
               </div>
             )}
 
@@ -203,9 +264,11 @@ const PatientAmbulancePage = () => {
                     onChange={(e) => setType(e.target.value)}
                     className="p-3 border rounded-xl w-full focus:ring-2 focus:ring-red-400 outline-none"
                   >
-                    <option>Normal</option>
-                    <option>Urgent</option>
-                    <option>Critical</option>
+                    {AMBULANCE_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

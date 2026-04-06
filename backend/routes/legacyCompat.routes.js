@@ -478,7 +478,7 @@ router.put("/nurse/update-task/:id", authMiddleware, async (req, res, next) => {
 
 router.post("/register/create", authMiddleware, async (req, res, next) => {
   try {
-    await query(
+    const result = await query(
       `INSERT INTO patients (hospital_id, first_name, last_name, email, phone, gender, date_of_birth, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
       [
@@ -491,7 +491,8 @@ router.post("/register/create", authMiddleware, async (req, res, next) => {
         req.body.date_of_birth,
       ]
     );
-    res.status(201).json({ success: true, message: "Patient created" });
+    const id = result?.insertId || null;
+    res.status(201).json({ success: true, message: "Patient created", id, patient: { id } });
   } catch (error) {
     next(error);
   }

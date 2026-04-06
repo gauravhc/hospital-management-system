@@ -52,7 +52,15 @@ export default function SuperAdminDashboard() {
 
       setStats(statRes.data || { hospitals: 0, admins: 0, staff: 0 });
       setHospitals(Array.isArray(hospRes.data?.hospitals) ? hospRes.data.hospitals : []);
-      setSuperAdmins(Array.isArray(saRes.data) ? saRes.data : []);
+      const superAdminPayload = saRes.data;
+      const superAdminRows = Array.isArray(superAdminPayload)
+        ? superAdminPayload
+        : Array.isArray(superAdminPayload?.data)
+          ? superAdminPayload.data
+          : Array.isArray(superAdminPayload?.admins)
+            ? superAdminPayload.admins
+            : [];
+      setSuperAdmins(superAdminRows);
       setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Error loading super admin dashboard:", err);
@@ -128,6 +136,28 @@ export default function SuperAdminDashboard() {
       staff: Number(stats?.staff || 0),
     };
   }, [displaySuperAdmins.length, hospitals, stats]);
+
+  const openCreateHospital = () => {
+    setFormError("");
+    setEditingHospitalId(null);
+    setNewHospital({
+      name: "",
+      address: "",
+      gst_number: "",
+      certification: "",
+      phone: "",
+      email: "",
+      password: "",
+    });
+    setShowHospitalModal(true);
+  };
+
+  const openCreateSuperAdmin = () => {
+    setFormError("");
+    setEditingSuperAdminId(null);
+    setNewSuperAdmin({ name: "", email: "", password: "", confirmPassword: "" });
+    setShowSuperAdminModal(true);
+  };
 
   const addHospital = async (e) => {
     e.preventDefault();
@@ -258,24 +288,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => {
-            setFormError("");
-            setEditingHospitalId(null);
-            setNewHospital({
-              name: "",
-              address: "",
-              gst_number: "",
-              certification: "",
-              phone: "",
-              email: "",
-              password: "",
-            });
-            setShowHospitalModal(true);
-          }}
-          className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl"
-        >
+        <div className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-sky-600 to-cyan-600 opacity-[0.10] transition group-hover:opacity-[0.16]" />
           <div className="relative flex items-start justify-between gap-4">
             <div>
@@ -288,18 +301,20 @@ export default function SuperAdminDashboard() {
               <Building2 size={22} />
             </div>
           </div>
-        </button>
+          <div className="relative mt-6 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-slate-500">Opens the “Add Hospital” form</span>
+            <button
+              type="button"
+              onClick={openCreateHospital}
+              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#4f46e5,#06b6d4)] px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-cyan-200/50 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 active:translate-y-0"
+            >
+              <Building2 size={18} />
+              Add Hospital
+            </button>
+          </div>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setFormError("");
-            setEditingSuperAdminId(null);
-            setNewSuperAdmin({ name: "", email: "", password: "", confirmPassword: "" });
-            setShowSuperAdminModal(true);
-          }}
-          className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl"
-        >
+        <div className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600 via-violet-600 to-indigo-600 opacity-[0.10] transition group-hover:opacity-[0.16]" />
           <div className="relative flex items-start justify-between gap-4">
             <div>
@@ -312,7 +327,18 @@ export default function SuperAdminDashboard() {
               <UserPlus size={22} />
             </div>
           </div>
-        </button>
+          <div className="relative mt-6 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-slate-500">Opens the “Create Super Admin” form</span>
+            <button
+              type="button"
+              onClick={openCreateSuperAdmin}
+              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#d946ef,#4f46e5)] px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-fuchsia-200/50 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/70 active:translate-y-0"
+            >
+              <UserPlus size={18} />
+              Create Super Admin
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -478,13 +504,32 @@ export default function SuperAdminDashboard() {
             <h3 className="text-xl font-bold text-gray-800">
               {editingHospitalId ? "Edit Hospital" : "Add Hospital"}
             </h3>
-            <form onSubmit={addHospital} className="mt-5 space-y-4">
+            <form onSubmit={addHospital} className="mt-5 space-y-4" autoComplete="off">
+              {/* Prevent browser autofilling the super-admin login into this modal */}
+              <input
+                className="hidden"
+                aria-hidden="true"
+                tabIndex={-1}
+                type="text"
+                name="sa_fake_username"
+                autoComplete="username"
+              />
+              <input
+                className="hidden"
+                aria-hidden="true"
+                tabIndex={-1}
+                type="password"
+                name="sa_fake_password"
+                autoComplete="current-password"
+              />
               <input
                 type="text"
                 placeholder="Hospital name"
                 value={newHospital.name}
                 onChange={(e) => setNewHospital((p) => ({ ...p, name: e.target.value }))}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
+                name="hospital_name"
+                autoComplete="off"
                 required
               />
               <input
@@ -493,6 +538,8 @@ export default function SuperAdminDashboard() {
                 value={newHospital.address}
                 onChange={(e) => setNewHospital((p) => ({ ...p, address: e.target.value }))}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
+                name="hospital_address"
+                autoComplete="off"
                 required
               />
               <input
@@ -501,6 +548,8 @@ export default function SuperAdminDashboard() {
                 value={newHospital.gst_number}
                 onChange={(e) => setNewHospital((p) => ({ ...p, gst_number: e.target.value }))}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
+                name="hospital_gst_number"
+                autoComplete="off"
                 required
               />
               <input
@@ -509,6 +558,8 @@ export default function SuperAdminDashboard() {
                 value={newHospital.certification}
                 onChange={(e) => setNewHospital((p) => ({ ...p, certification: e.target.value }))}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
+                name="hospital_certification"
+                autoComplete="off"
                 required
               />
               <input
@@ -517,6 +568,8 @@ export default function SuperAdminDashboard() {
                 value={newHospital.phone}
                 onChange={(e) => setNewHospital((p) => ({ ...p, phone: e.target.value }))}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
+                name="hospital_phone"
+                autoComplete="off"
                 required
               />
               <input
@@ -525,6 +578,10 @@ export default function SuperAdminDashboard() {
                 value={newHospital.email}
                 onChange={(e) => setNewHospital((p) => ({ ...p, email: e.target.value }))}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
+                name="hospital_admin_email"
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
                 required
               />
               {!editingHospitalId ? (
@@ -534,6 +591,10 @@ export default function SuperAdminDashboard() {
                   value={newHospital.password}
                   onChange={(e) => setNewHospital((p) => ({ ...p, password: e.target.value }))}
                   className="w-full rounded-lg border px-3 py-2 text-sm"
+                  name="hospital_admin_password"
+                  autoComplete="new-password"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                   required
                 />
               ) : null}
