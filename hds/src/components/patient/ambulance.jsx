@@ -169,7 +169,13 @@ const PatientAmbulancePage = () => {
       setTime("");
     } catch (err) {
       console.error(err);
-      setError(err?.message || "Failed to request ambulance");
+      const message = err?.message || "Failed to request ambulance";
+      if (String(message).toLowerCase().includes("active ambulance request")) {
+        setError(`${message}. Scroll down to see "Latest Ambulance Request".`);
+        await loadLatestRequest();
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
