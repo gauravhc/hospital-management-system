@@ -47,6 +47,18 @@ const PatientAmbulancePage = () => {
     return s;
   }, [latestRequest]);
 
+  const latestHospitalLabel = useMemo(() => {
+    const drop = String(latestRequest?.drop_address || latestRequest?.dropAddress || "").trim();
+    const requestHospitalId = latestRequest?.hospital_id || latestRequest?.hospitalId || "";
+
+    if (requestHospitalId) {
+      const match = hospitals.find((h) => String(h?.id) === String(requestHospitalId));
+      if (match?.name) return `${match.name}${match.address ? ` - ${match.address}` : ""}`;
+    }
+
+    return drop || (requestHospitalId ? String(requestHospitalId) : "--");
+  }, [latestRequest, hospitals]);
+
   const loadLatestRequest = async () => {
     try {
       setLoadingStatus(true);
@@ -255,6 +267,11 @@ const PatientAmbulancePage = () => {
                       ETA: {latestRequest.eta_minutes} min
                     </div>
                   ) : null}
+                </div>
+
+                <div className="mt-3 text-sm text-slate-700">
+                  <span className="font-semibold">Hospital:</span>{" "}
+                  {latestHospitalLabel}
                 </div>
 
                 {(latestRequest?.driver_name ||
