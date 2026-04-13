@@ -38,6 +38,7 @@ router.post("/register", upload.single("profile_image"), asyncHandler(controller
 router.use(authMiddleware);
 
 router.get("/", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.list));
+router.get("/search", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.search));
 router.post("/", hospitalScope, roleMiddleware("super_admin", "hospital_admin"), asyncHandler(controller.create));
 router.put("/profile", roleMiddleware("patient"), upload.single("profile_image"), asyncHandler(controller.updateProfile));
 router.get("/profile", roleMiddleware("patient"), asyncHandler(controller.getProfile));
@@ -49,7 +50,10 @@ router.delete("/documents/:id", roleMiddleware("patient"), asyncHandler(controll
 router.get("/appointments", roleMiddleware("patient"), asyncHandler(controller.listAppointments));
 router.get("/bills", roleMiddleware("patient"), asyncHandler(controller.listBills));
 router.get("/lab-reports", roleMiddleware("patient"), asyncHandler(controller.listLabReports));
+router.post("/lab-tests", roleMiddleware("patient"), asyncHandler(controller.orderLabTest));
+router.get("/lab-tests", roleMiddleware("patient"), asyncHandler(controller.listMyLabTests));
 
+// NOTE: keep specific routes (like /search) above /:id to avoid conflicts.
 router.get("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.getById));
 router.put("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor"), asyncHandler(controller.update));
 router.delete("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin"), asyncHandler(controller.remove));

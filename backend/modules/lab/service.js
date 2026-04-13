@@ -1,4 +1,5 @@
 const { query } = require("../../config/database");
+const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
 
 function tests(hospitalId) {
   return hospitalId
@@ -6,11 +7,54 @@ function tests(hospitalId) {
     : query(`SELECT * FROM lab_tests ORDER BY id DESC`);
 }
 
-function createTest(payload, hospitalId) {
+async function createTest(payload, hospitalId) {
+  const cols = await getTableColumns("lab_tests");
+  if (!cols) throw new Error("lab_tests table not found");
+
+  const patientId = payload.patient_id || payload.patientId || null;
+  const testName = payload.test_name || payload.testName || null;
+  if (!patientId || !testName) {
+    throw new Error("patient_id and test_name are required");
+  }
+
+  const record = {};
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  if (hospitalCol) record[hospitalCol] = hospitalId || payload.hospital_id || null;
+
+  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId"]);
+  if (patientCol) record[patientCol] = patientId;
+
+  const doctorCol = firstExistingColumn(cols, ["doctor_id", "doctorId"]);
+  if (doctorCol) record[doctorCol] = payload.doctor_id || payload.doctorId || null;
+
+  const testNameCol = firstExistingColumn(cols, ["test_name", "name", "test"]);
+  if (testNameCol) record[testNameCol] = String(testName).trim();
+
+  const testCodeCol = firstExistingColumn(cols, ["test_code", "code"]);
+  if (testCodeCol) record[testCodeCol] = payload.test_code || payload.testCode || null;
+
+  const categoryCol = firstExistingColumn(cols, ["category", "department"]);
+  if (categoryCol) record[categoryCol] = payload.category || null;
+
+  const priceCol = firstExistingColumn(cols, ["price", "amount"]);
+  if (priceCol) record[priceCol] = payload.price ?? 0;
+
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  if (statusCol) record[statusCol] = payload.status || "ordered";
+
+  const notesCol = firstExistingColumn(cols, ["notes", "note", "remarks"]);
+  if (notesCol) record[notesCol] = payload.notes || null;
+
+  const orderedAtCol = firstExistingColumn(cols, ["ordered_at"]);
+  if (orderedAtCol) record[orderedAtCol] = new Date();
+
+  const insertCols = Object.keys(record).filter((k) => cols.has(k));
+  const placeholders = insertCols.map(() => "?").join(", ");
+  const values = insertCols.map((k) => record[k]);
+
   return query(
-    `INSERT INTO lab_tests (hospital_id, test_name, price)
-     VALUES (?, ?, ?)`,
-    [hospitalId || payload.hospital_id, payload.test_name, payload.price || 0]
+    `INSERT INTO lab_tests (${insertCols.map((c) => `\`${c}\``).join(", ")}) VALUES (${placeholders})`,
+    values
   );
 }
 

@@ -204,10 +204,15 @@ export default function DoctorPatientsPage() {
 
               {!loading
                 ? filtered.map((patient) => (
-                    <tr key={patient.id} className="text-sm text-slate-700">
+                    <tr
+                      key={patient.id}
+                      className="text-sm text-slate-700 cursor-pointer hover:bg-slate-50"
+                      onClick={() => router.push(`/doctor/patients/${patient.id}`)}
+                    >
                       <td className="px-6 py-4">
                         <p className="font-semibold text-slate-900">{patient.full_name || "--"}</p>
                         <p className="mt-1 text-xs text-slate-500">{patient.email || "--"}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">Patient ID: {patient.id}</p>
                       </td>
                       <td className="px-6 py-4">{patient.phone || "--"}</td>
                       <td className="px-6 py-4 capitalize">{patient.gender || "--"}</td>

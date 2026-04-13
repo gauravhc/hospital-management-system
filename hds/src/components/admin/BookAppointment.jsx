@@ -13,8 +13,8 @@ const SERVICE_BY_DEPARTMENT = {
   Pediatrics: ["Child Checkup", "Vaccination"],
 };
 
-const normalizeUsersResponse = (payload) => {
-  const data = payload?.users ?? payload?.data ?? payload?.results ?? payload;
+const normalizePatientSearchResponse = (payload) => {
+  const data = payload?.patients ?? payload?.data ?? payload?.results ?? payload;
   return Array.isArray(data) ? data : [];
 };
 
@@ -144,8 +144,8 @@ export default function BookAppointment() {
     const timer = setTimeout(async () => {
       try {
         setPatientLoading(true);
-        const data = await apiGet("/api/admin/users", { role: "patient", q });
-        setPatientResults(normalizeUsersResponse(data));
+        const data = await apiGet("/api/patients/search", { q, hospital_id: form.hospitalId, limit: 20 });
+        setPatientResults(normalizePatientSearchResponse(data));
       } catch (err) {
         console.error("Patient search failed:", err);
         setPatientResults([]);
@@ -155,7 +155,7 @@ export default function BookAppointment() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [patientQuery, mode]);
+  }, [patientQuery, mode, form.hospitalId]);
 
   const onFormChange = (e) => {
     const { name, value } = e.target;
@@ -235,14 +235,14 @@ export default function BookAppointment() {
     try {
       setSubmitting(true);
 
-      let patientId = selectedPatient?.id ? Number(selectedPatient.id) : null;
+      let patientId = selectedPatient?.id ?? null;
 
       if (mode === "new") {
         const created = await apiPost("/api/register/create", {
           ...newPatient,
           hospital_id: form.hospitalId,
         });
-        patientId = Number(created?.id || created?.patient?.id || created?.patient_id || 0) || null;
+        patientId = created?.id || created?.patient?.id || created?.patient_id || null;
         if (!patientId) {
           throw new Error("Patient created, but the server did not return a patient id.");
         }

@@ -7,11 +7,14 @@ const statements = [
     CREATE TABLE IF NOT EXISTS hospitals (
       id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
       name VARCHAR(255) NOT NULL,
+      type_of_hospital ENUM('Hospital','Clinic','Lab','Pharmacy') DEFAULT 'Hospital',
       address TEXT NULL,
       phone VARCHAR(20) NULL,
       email VARCHAR(100) NULL UNIQUE,
       website VARCHAR(255) NULL,
       license_no VARCHAR(100) NULL UNIQUE,
+      license_document VARCHAR(255) NULL,
+      verification_status ENUM('Pending','Approved','Rejected') DEFAULT 'Pending',
       bed_capacity INT DEFAULT 0,
       is_active BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -143,7 +146,7 @@ const statements = [
       id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
       hospital_id VARCHAR(36) NOT NULL,
       vehicle_no VARCHAR(50) NOT NULL UNIQUE,
-      type ENUM('basic','advanced','air','neonatal') DEFAULT 'basic',
+      type ENUM('basic','advanced','icu','oxygen','cardiac','air','neonatal') DEFAULT 'basic',
       model VARCHAR(100) NULL,
       year YEAR NULL,
       driver_name VARCHAR(150) NULL,
@@ -244,6 +247,8 @@ const statements = [
       doctor_id VARCHAR(36) NULL,
       test_name VARCHAR(255) NOT NULL,
       test_code VARCHAR(100) NULL,
+      category VARCHAR(100) NULL,
+      price DECIMAL(10,2) DEFAULT 0.00,
       status ENUM('ordered','in_progress','completed','cancelled') DEFAULT 'ordered',
       notes TEXT NULL,
       ordered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -481,6 +486,64 @@ async function ensureLegacyRoleImageColumns() {
   await ensure("nurses");
 }
 
+async function ensureStaffProfessionalColumns() {
+  const ensure = async (table) => {
+    clearTableColumnsCache(table);
+    const cols = await getTableColumns(table);
+    if (!cols) return;
+
+    const addColumnIfMissing = async (name, ddl) => {
+      if (cols.has(name)) return;
+      await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+    };
+
+    await addColumnIfMissing("qualification", "`qualification` VARCHAR(255) NULL");
+    await addColumnIfMissing("experience_years", "`experience_years` INT DEFAULT 0");
+    await addColumnIfMissing("expertise_area", "`expertise_area` VARCHAR(255) NULL");
+    await addColumnIfMissing("certificate_file", "`certificate_file` VARCHAR(500) NULL");
+  };
+
+  await ensure("doctors");
+  await ensure("nurses");
+  // `staff` exists only in legacy mode; ERP mode may not have it.
+  await ensure("staff");
+}
+
+async function ensureAmbulanceTypeOptions() {
+  try {
+    clearTableColumnsCache("ambulances");
+    const cols = await getTableColumns("ambulances");
+    if (!cols || !cols.has("type")) return;
+
+    // Expand enum options in-place so new UI values don't fail inserts.
+    await query(
+      "ALTER TABLE ambulances MODIFY COLUMN type ENUM('basic','advanced','icu','oxygen','cardiac','air','neonatal') DEFAULT 'basic'"
+    );
+  } catch (err) {
+    // Best-effort: some installs may not have the ambulances table (legacy-only DBs).
+    console.warn("ensureAmbulanceTypeOptions skipped:", err?.message || err);
+  }
+}
+
+async function ensureLabTestExtensions() {
+  try {
+    clearTableColumnsCache("lab_tests");
+    const cols = await getTableColumns("lab_tests");
+    if (!cols) return;
+
+    const addColumnIfMissing = async (name, ddl) => {
+      if (cols.has(name)) return;
+      await query(`ALTER TABLE lab_tests ADD COLUMN ${ddl}`);
+      cols.add(name);
+    };
+
+    await addColumnIfMissing("category", "`category` VARCHAR(100) NULL");
+    await addColumnIfMissing("price", "`price` DECIMAL(10,2) DEFAULT 0.00");
+  } catch (err) {
+    console.warn("ensureLabTestExtensions skipped:", err?.message || err);
+  }
+}
+
 async function ensureErpRoleImageColumns() {
   const ensure = async (table) => {
     clearTableColumnsCache(table);
@@ -590,9 +653,166 @@ async function ensureNurseModuleTables() {
     await addColumnIfMissing("patient_id", "`patient_id` VARCHAR(36) NULL");
     await addColumnIfMissing("task_title", "`task_title` VARCHAR(255) NULL");
     await addColumnIfMissing("description", "`description` TEXT NULL");
+    await addColumnIfMissing("treatment", "`treatment` TEXT NULL");
+    await addColumnIfMissing("tests", "`tests` TEXT NULL");
     await addColumnIfMissing("priority", "`priority` ENUM('low','medium','high') DEFAULT 'medium'");
     await addColumnIfMissing("assigned_by", "`assigned_by` VARCHAR(36) NULL");
     await addColumnIfMissing("created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+  }
+}
+
+async function ensureNotificationsTable() {
+  const mode = await getSchemaMode();
+
+  if (mode === "legacy") {
+    await query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INT NOT NULL AUTO_INCREMENT,
+        user_id INT DEFAULT NULL,
+        message TEXT,
+        status ENUM('read','unread') DEFAULT 'unread',
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        INDEX idx_notifications_user (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    clearTableColumnsCache("notifications");
+    return;
+  }
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+      user_id VARCHAR(36) NULL,
+      message TEXT NULL,
+      status ENUM('read','unread') DEFAULT 'unread',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_notifications_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  clearTableColumnsCache("notifications");
+}
+
+async function ensureHospitalExtensions() {
+  try {
+    const cols = await getTableColumns("hospitals");
+    if (!cols) return;
+
+    const addColumnIfMissing = async (name, ddl) => {
+      if (cols.has(name)) return;
+      await query(`ALTER TABLE hospitals ADD COLUMN ${ddl}`);
+      clearTableColumnsCache("hospitals");
+    };
+
+    await addColumnIfMissing(
+      "type_of_hospital",
+      "`type_of_hospital` ENUM('Hospital','Clinic','Lab','Pharmacy') DEFAULT 'Hospital'"
+    );
+    await addColumnIfMissing("license_document", "`license_document` VARCHAR(255) NULL");
+    await addColumnIfMissing(
+      "verification_status",
+      "`verification_status` ENUM('Pending','Approved','Rejected') DEFAULT 'Pending'"
+    );
+  } catch (err) {
+    // Should not block bootstrapping if the schema is managed externally.
+    console.warn("ensureHospitalExtensions skipped:", err?.message || err);
+  }
+}
+
+async function ensureStructuredMedicalHistory() {
+  const addColumnsIfMissing = async (table, columns) => {
+    const cols = await getTableColumns(table);
+    if (!cols) return;
+
+    for (const [name, ddl] of columns) {
+      if (cols.has(name)) continue;
+      await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+      clearTableColumnsCache(table);
+    }
+  };
+
+  try {
+    await addColumnsIfMissing("patient_medical_history", [
+      [
+        "condition_type",
+        "`condition_type` ENUM('Fever','Diabetes','BP','Heart Disease','Allergy','Other') NULL",
+      ],
+      ["has_condition", "`has_condition` ENUM('Yes','No') DEFAULT 'No'"],
+      ["follow_up", "`follow_up` ENUM('Yes','No') NULL"],
+      ["emergency_required", "`emergency_required` ENUM('Yes','No') NULL"],
+    ]);
+
+    await addColumnsIfMissing("medical_history", [
+      [
+        "condition_type",
+        "`condition_type` ENUM('Fever','Diabetes','BP','Heart Disease','Allergy','Other') NULL",
+      ],
+      ["has_condition", "`has_condition` ENUM('Yes','No') DEFAULT 'No'"],
+      ["follow_up", "`follow_up` ENUM('Yes','No') NULL"],
+      ["emergency_required", "`emergency_required` ENUM('Yes','No') NULL"],
+      // Some installs use `medications`; others will use `treatment`.
+      ["treatment", "`treatment` TEXT NULL"],
+    ]);
+  } catch (err) {
+    console.warn("ensureStructuredMedicalHistory skipped:", err?.message || err);
+  }
+}
+
+async function ensurePatientInsuranceTable() {
+  try {
+    const mode = await getSchemaMode();
+
+    if (mode === "legacy") {
+      await query(`
+        CREATE TABLE IF NOT EXISTS patient_insurance (
+          id INT NOT NULL AUTO_INCREMENT,
+          patient_id INT NOT NULL,
+          hospital_id INT NULL,
+          aadhaar_number VARCHAR(20) NULL,
+          pan_number VARCHAR(20) NULL,
+          aadhaar_photo VARCHAR(255) NULL,
+          pan_photo VARCHAR(255) NULL,
+          insurance_number VARCHAR(100) NULL,
+          policy_id VARCHAR(100) NULL,
+          insurance_card_photo VARCHAR(255) NULL,
+          validity_date DATE NULL,
+          claim_amount DECIMAL(12,2) NULL,
+          created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          INDEX idx_patient_insurance_patient (patient_id),
+          INDEX idx_patient_insurance_hospital (hospital_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `);
+      clearTableColumnsCache("patient_insurance");
+      return;
+    }
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS patient_insurance (
+        id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        patient_id VARCHAR(36) NOT NULL,
+        hospital_id VARCHAR(36) NULL,
+        aadhaar_number VARCHAR(20) NULL,
+        pan_number VARCHAR(20) NULL,
+        aadhaar_photo VARCHAR(255) NULL,
+        pan_photo VARCHAR(255) NULL,
+        insurance_number VARCHAR(100) NULL,
+        policy_id VARCHAR(100) NULL,
+        insurance_card_photo VARCHAR(255) NULL,
+        validity_date DATE NULL,
+        claim_amount DECIMAL(12,2) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_patient_insurance_patient (patient_id),
+        INDEX idx_patient_insurance_hospital (hospital_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    clearTableColumnsCache("patient_insurance");
+  } catch (err) {
+    console.warn("ensurePatientInsuranceTable skipped:", err?.message || err);
   }
 }
 
@@ -635,7 +855,13 @@ async function ensureErpSchema() {
 
     await ensureLegacyStaffSchema();
     await ensureLegacyRoleImageColumns();
+    await ensureStaffProfessionalColumns();
     await ensureNurseModuleTables();
+    await ensureNotificationsTable();
+    await ensureHospitalExtensions();
+    await ensureStructuredMedicalHistory();
+    await ensurePatientInsuranceTable();
+    await ensureLabTestExtensions();
     return;
   }
 
@@ -646,8 +872,29 @@ async function ensureErpSchema() {
   // Ensure profile images are supported for ERP mode role tables.
   await ensureErpRoleImageColumns();
 
+  // Professional staff fields used during onboarding.
+  await ensureStaffProfessionalColumns();
+
+  // Ensure ambulance type enum supports the admin UI options.
+  await ensureAmbulanceTypeOptions();
+
+  // Ensure lab_tests supports booking metadata (category + price).
+  await ensureLabTestExtensions();
+
   // Nurse module tables (tasks + patient vitals).
   await ensureNurseModuleTables();
+
+  // Notification table (user activity feed).
+  await ensureNotificationsTable();
+
+  // Hospital extensions (type + license doc path).
+  await ensureHospitalExtensions();
+
+  // Structured patient medical history fields.
+  await ensureStructuredMedicalHistory();
+
+  // Patient insurance identity & policy uploads.
+  await ensurePatientInsuranceTable();
 
   const defaultRoles = [
     ["super_admin", "Super Administrator", JSON.stringify(["*"])],

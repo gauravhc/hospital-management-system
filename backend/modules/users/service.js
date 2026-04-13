@@ -173,6 +173,34 @@ async function create(payload, scopedHospitalId) {
   if (cols.has("department") && payload.department !== undefined) {
     values.department = payload.department || null;
   }
+
+  const qualificationCol = firstExistingColumn(cols, ["qualification"]);
+  if (qualificationCol && payload.qualification !== undefined) {
+    values[qualificationCol] = payload.qualification || null;
+  }
+
+  const experienceCol = firstExistingColumn(cols, ["experience_years", "experience"]);
+  if (experienceCol && payload.experience_years !== undefined) {
+    const raw = payload.experience_years;
+    const parsed = raw === "" || raw === null ? null : Number(raw);
+    values[experienceCol] = Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : null;
+  }
+
+  const expertiseCol = firstExistingColumn(cols, ["expertise_area", "area_of_expertise", "expertise"]);
+  if (expertiseCol && payload.expertise_area !== undefined) {
+    values[expertiseCol] = payload.expertise_area || null;
+  }
+
+  const certificateCol = firstExistingColumn(cols, [
+    "certificate_file",
+    "registration_certificate",
+    "registration_certificate_file",
+    "certificate_path",
+  ]);
+  if (certificateCol && payload.certificate_file !== undefined) {
+    values[certificateCol] = payload.certificate_file || null;
+  }
+
   if (cols.has("dob") && payload.dob !== undefined) {
     values.dob = payload.dob || null;
   }
@@ -309,6 +337,38 @@ async function update(id, payload) {
     updates.push("`department` = ?");
     params.push(payload.department || null);
   }
+
+  const qualificationCol = firstExistingColumn(cols, ["qualification"]);
+  if (qualificationCol && payload.qualification !== undefined) {
+    updates.push(`\`${qualificationCol}\` = ?`);
+    params.push(payload.qualification || null);
+  }
+
+  const experienceCol = firstExistingColumn(cols, ["experience_years", "experience"]);
+  if (experienceCol && payload.experience_years !== undefined) {
+    const raw = payload.experience_years;
+    const parsed = raw === "" || raw === null ? null : Number(raw);
+    updates.push(`\`${experienceCol}\` = ?`);
+    params.push(Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : null);
+  }
+
+  const expertiseCol = firstExistingColumn(cols, ["expertise_area", "area_of_expertise", "expertise"]);
+  if (expertiseCol && payload.expertise_area !== undefined) {
+    updates.push(`\`${expertiseCol}\` = ?`);
+    params.push(payload.expertise_area || null);
+  }
+
+  const certificateCol = firstExistingColumn(cols, [
+    "certificate_file",
+    "registration_certificate",
+    "registration_certificate_file",
+    "certificate_path",
+  ]);
+  if (certificateCol && payload.certificate_file !== undefined) {
+    updates.push(`\`${certificateCol}\` = ?`);
+    params.push(payload.certificate_file || null);
+  }
+
   if (cols.has("dob") && payload.dob !== undefined) {
     updates.push("`dob` = ?");
     params.push(payload.dob || null);

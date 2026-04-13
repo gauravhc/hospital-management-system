@@ -8,6 +8,12 @@ export default function PatientAppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const normalizeDate = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "--";
+    return raw.includes("T") ? raw.split("T")[0] : raw;
+  };
+
   useEffect(() => {
     const loadAppointments = async () => {
       setLoading(true);
@@ -38,7 +44,9 @@ export default function PatientAppointmentsPage() {
           <thead className="bg-slate-50">
             <tr>
               <th className="p-2 text-left">ID</th>
+              <th className="p-2 text-left">Hospital</th>
               <th className="p-2 text-left">Doctor</th>
+              <th className="p-2 text-left">Department</th>
               <th className="p-2 text-left">Date</th>
               <th className="p-2 text-left">Time</th>
               <th className="p-2 text-left">Status</th>
@@ -48,15 +56,17 @@ export default function PatientAppointmentsPage() {
             {appointments.map((a) => (
               <tr key={a.id} className="border-t">
                 <td className="p-2">{a.id}</td>
+                <td className="p-2">{a.hospital_name || a.hospitalName || "--"}</td>
                 <td className="p-2">{a.doctor_name || a.doctorName || a.doctor_id || "--"}</td>
-                <td className="p-2">{a.appointment_date || a.date || "--"}</td>
+                <td className="p-2">{a.doctor_department || a.department || "--"}</td>
+                <td className="p-2">{normalizeDate(a.appointment_date || a.date)}</td>
                 <td className="p-2">{a.appointment_time || a.time || "--"}</td>
                 <td className="p-2">{a.status || "--"}</td>
               </tr>
             ))}
             {!loading && appointments.length === 0 ? (
               <tr>
-                <td className="p-3 text-slate-500" colSpan={5}>
+                <td className="p-3 text-slate-500" colSpan={7}>
                   No appointments found.
                 </td>
               </tr>

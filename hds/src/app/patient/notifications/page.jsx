@@ -68,6 +68,13 @@ function formatRelativeMinutes(diffMinutes) {
   return `${Math.abs(mins)} min ago`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "";
+  const dt = new Date(String(value));
+  if (Number.isNaN(dt.getTime())) return String(value);
+  return dt.toLocaleString();
+}
+
 function isActiveAppointmentStatus(statusValue) {
   const status = String(statusValue || "").trim().toLowerCase();
   if (!status) return true;
@@ -80,6 +87,7 @@ export default function PatientNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [appointments, setAppointments] = useState([]);
+  const [updates, setUpdates] = useState([]);
   const [tick, setTick] = useState(Date.now());
 
   const patientUserId = useMemo(() => {
@@ -101,12 +109,30 @@ export default function PatientNotificationsPage() {
         throw new Error("Missing patient ID. Please log in again.");
       }
 
-      const res = await apiGet(`/api/appointments/patient/${patientUserId}`);
-      const list = Array.isArray(res?.appointments) ? res.appointments : Array.isArray(res?.data) ? res.data : [];
-      setAppointments(list);
+      const [appointmentsRes, updatesRes] = await Promise.allSettled([
+        apiGet(`/api/appointments/patient/${patientUserId}`),
+        apiGet("/api/notifications/me", { limit: 50 }),
+      ]);
+
+      if (appointmentsRes.status === "fulfilled") {
+        const res = appointmentsRes.value;
+        const list = Array.isArray(res?.appointments) ? res.appointments : Array.isArray(res?.data) ? res.data : [];
+        setAppointments(list);
+      } else {
+        setAppointments([]);
+      }
+
+      if (updatesRes.status === "fulfilled") {
+        const res = updatesRes.value;
+        const list = Array.isArray(res?.notifications) ? res.notifications : Array.isArray(res?.data) ? res.data : [];
+        setUpdates(list);
+      } else {
+        setUpdates([]);
+      }
     } catch (err) {
       setError(err?.message || "Failed to load notifications.");
       setAppointments([]);
+      setUpdates([]);
     } finally {
       setLoading(false);
     }
@@ -162,6 +188,16 @@ export default function PatientNotificationsPage() {
       });
   }, [appointments, tick]);
 
+  const updateItems = useMemo(() => {
+    const list = Array.isArray(updates) ? updates : [];
+    return list.map((n) => ({
+      id: String(n.id || ""),
+      message: String(n.message || "").trim(),
+      status: String(n.status || "unread").toLowerCase(),
+      createdAt: n.created_at || n.createdAt,
+    }));
+  }, [updates]);
+
   return (
     <div className="space-y-6">
       <div className={cardClass}>
@@ -169,7 +205,7 @@ export default function PatientNotificationsPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Patient Notifications</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Alerts are generated from your upcoming appointments (next 7 days).
+              Updates are generated when appointments are booked or their status changes.
             </p>
           </div>
           <button
@@ -188,6 +224,50 @@ export default function PatientNotificationsPage() {
             {error}
           </div>
         ) : null}
+      </div>
+
+      <div className={cardClass}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Bell size={18} className="text-sky-600" />
+            <h2 className="text-lg font-bold text-slate-900">Updates</h2>
+          </div>
+          <Link href="/patient/appointments" className="text-sm font-semibold text-sky-700 hover:underline">
+            View appointments
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="mt-5 flex items-center gap-3 text-slate-600">
+            <Loader2 className="animate-spin" size={18} />
+            Loading updates...
+          </div>
+        ) : updateItems.length === 0 ? (
+          <p className="mt-5 text-slate-600">No appointment updates yet.</p>
+        ) : (
+          <div className="mt-5 space-y-3">
+            {updateItems.map((n) => (
+              <div key={n.id || n.createdAt} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">Appointment update</p>
+                    <p className="mt-1 text-sm text-slate-600">{n.message || "Update"}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock size={14} />
+                        {formatDateTime(n.createdAt) || "—"}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar size={14} />
+                        {n.status === "read" ? "Read" : "New"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className={cardClass}>

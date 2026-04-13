@@ -12,14 +12,13 @@ export default function DoctorAssignTaskPage() {
   const [toast, setToast] = useState(null);
   const [error, setError] = useState("");
 
-  const [nurses, setNurses] = useState([]);
+  const [assignees, setAssignees] = useState([]);
   const [patients, setPatients] = useState([]);
 
   const [form, setForm] = useState({
-    nurse_id: "",
     patient_id: "",
-    task_title: "",
-    description: "",
+    treatment: "",
+    tests: [],
     priority: "medium",
   });
 
@@ -41,15 +40,16 @@ export default function DoctorAssignTaskPage() {
       setLoading(true);
       setError("");
       try {
-        const [nurseRes, patientRes] = await Promise.all([
+        const [assigneeRes, patientRes] = await Promise.all([
           apiGet("/api/hospital/nurses"),
           apiGet("/api/hospital/patients"),
         ]);
-        setNurses(Array.isArray(nurseRes?.data) ? nurseRes.data : []);
+
+        setAssignees(Array.isArray(assigneeRes?.data) ? assigneeRes.data : []);
         setPatients(Array.isArray(patientRes?.data) ? patientRes.data : []);
       } catch (e) {
-        setError(e?.message || "Failed to load nurses/patients.");
-        setNurses([]);
+        setError(e?.message || "Failed to load data.");
+        setAssignees([]);
         setPatients([]);
       } finally {
         setLoading(false);
@@ -59,14 +59,10 @@ export default function DoctorAssignTaskPage() {
     load();
   }, [router]);
 
-  const nurseOptions = useMemo(
-    () =>
-      (nurses || []).map((n) => ({
-        id: n.id,
-        label: n.full_name || n.name || n.email || String(n.id),
-      })),
-    [nurses]
-  );
+  const defaultAssigneeId = useMemo(() => {
+    const first = Array.isArray(assignees) ? assignees[0] : null;
+    return first?.id || first?.nurse_id || first?.user_id || "";
+  }, [assignees]);
 
   const patientOptions = useMemo(
     () =>
@@ -82,30 +78,65 @@ export default function DoctorAssignTaskPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const onTestsChange = (e) => {
+    const selected = Array.from(e.target.selectedOptions || []).map((opt) => opt.value);
+    setForm((prev) => ({ ...prev, tests: selected }));
+  };
+
+  const TEST_OPTIONS = [
+    "CBC",
+    "CRP",
+    "ESR",
+    "Blood Sugar (FBS)",
+    "Blood Sugar (PPBS)",
+    "HbA1c",
+    "LFT",
+    "RFT",
+    "Lipid Profile",
+    "TSH",
+    "Urine Routine",
+    "ECG",
+    "X-Ray",
+    "Ultrasound",
+  ];
+
   const submit = async (e) => {
     e.preventDefault();
     setToast(null);
     setError("");
 
-    if (!form.nurse_id || !form.patient_id || !form.task_title.trim()) {
-      setToast({ type: "error", message: "Select nurse, patient, and enter task title." });
+    if (!form.patient_id || !form.treatment.trim()) {
+      setToast({ type: "error", message: "Select patient and enter treatment." });
       return;
     }
 
     setSubmitting(true);
     try {
+      if (!defaultAssigneeId) {
+        setToast({ type: "error", message: "No staff available for this hospital." });
+        return;
+      }
+
+      const selectedTests = Array.isArray(form.tests) ? form.tests : [];
+      const descriptionLines = [
+        `Treatment: ${form.treatment.trim()}`,
+        selectedTests.length ? `Tests: ${selectedTests.join(", ")}` : null,
+      ].filter(Boolean);
+
       await apiPost("/api/tasks/assign", {
-        nurse_id: form.nurse_id,
+        nurse_id: defaultAssigneeId,
         patient_id: form.patient_id,
-        task_title: form.task_title.trim(),
-        description: form.description.trim(),
+        task_title: "Treatment & Tests",
+        description: descriptionLines.join("\n"),
+        treatment: form.treatment.trim(),
+        tests: form.tests,
         priority: form.priority,
       });
 
-      setToast({ type: "success", message: "Task assigned successfully" });
-      setForm((prev) => ({ ...prev, task_title: "", description: "", priority: "medium" }));
+      setToast({ type: "success", message: "Saved successfully" });
+      setForm((prev) => ({ ...prev, treatment: "", tests: [], priority: "medium" }));
     } catch (e2) {
-      setToast({ type: "error", message: e2?.message || "Failed to assign task" });
+      setToast({ type: "error", message: e2?.message || "Failed to save" });
     } finally {
       setSubmitting(false);
     }
@@ -127,9 +158,9 @@ export default function DoctorAssignTaskPage() {
         </div>
       ) : null}
 
-      <h1 className="text-2xl font-bold text-slate-900">Assign Task to Nurse</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Treatment & Tests</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Assign a task to a nurse in your hospital. The nurse will see it instantly in their dashboard.
+        Add treatment instructions and select recommended tests for the patient.
       </p>
 
       {loading ? <p className="mt-6 text-slate-600">Loading...</p> : null}
@@ -137,63 +168,50 @@ export default function DoctorAssignTaskPage() {
 
       {!loading && !error ? (
         <form onSubmit={submit} className="mt-6 space-y-4 max-w-2xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Patient</label>
-              <select
-                name="patient_id"
-                value={form.patient_id}
-                onChange={onChange}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Select patient</option>
-                {patientOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-slate-700">Nurse</label>
-              <select
-                name="nurse_id"
-                value={form.nurse_id}
-                onChange={onChange}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Select nurse</option>
-                {nurseOptions.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <div>
-            <label className="text-sm font-semibold text-slate-700">Task Title</label>
-            <input
-              name="task_title"
-              value={form.task_title}
+            <label className="text-sm font-semibold text-slate-700">Patient</label>
+            <select
+              name="patient_id"
+              value={form.patient_id}
               onChange={onChange}
               className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-              placeholder="e.g. Check Blood Pressure"
-            />
+            >
+              <option value="">Select patient</option>
+              {patientOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-slate-700">Description</label>
+            <label className="text-sm font-semibold text-slate-700">Treatment</label>
             <textarea
-              name="description"
-              value={form.description}
+              name="treatment"
+              value={form.treatment}
               onChange={onChange}
               className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               rows={4}
-              placeholder="e.g. Monitor BP every 2 hours"
+              placeholder="e.g. Start antibiotics, hydration, monitor vitals..."
             />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-700">Tests</label>
+            <select
+              multiple
+              value={form.tests}
+              onChange={onTestsChange}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm min-h-[120px]"
+            >
+              {TEST_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">Hold Ctrl/Cmd to select multiple.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -217,11 +235,10 @@ export default function DoctorAssignTaskPage() {
             disabled={submitting}
             className="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-extrabold text-white hover:bg-sky-700 disabled:opacity-60"
           >
-            {submitting ? "Assigning..." : "Assign Task"}
+            {submitting ? "Saving..." : "Save"}
           </button>
         </form>
       ) : null}
     </div>
   );
 }
-

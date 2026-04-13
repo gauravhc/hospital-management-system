@@ -16,6 +16,9 @@ const INITIAL_FORM = {
   department: "",
   role: "",
   specialization: "", // For sub-roles
+  experience_years: "",
+  qualification: "",
+  expertise_area: "",
   mobile: "",
   alt_mobile: "",
   join_date: "",
@@ -32,6 +35,7 @@ const INITIAL_FORM = {
   passbook_file: null,
   government_proof: null,
   photo: null,
+  certificate_file: null,
 };
 
 // Senior Dev Pattern: Customized Input Components for consistency
@@ -72,6 +76,52 @@ const FormInput = ({ label, name, type = "text", value, onChange, error, icon: I
     )}
   </div>
 );
+
+const DatalistInput = ({ label, name, value, onChange, error, icon: Icon, required, options = [], ...props }) => {
+  const listId = `${name}-list`;
+  return (
+    <div className="flex flex-col gap-1.5 w-full">
+      <label className="text-sm font-semibold text-gray-700 flex items-center gap-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <div className="relative group">
+        {Icon && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+            <Icon size={18} />
+          </div>
+        )}
+        <input
+          name={name}
+          value={value}
+          onChange={onChange}
+          list={listId}
+          className={`
+            w-full pl-${Icon ? '10' : '4'} pr-4 py-2.5 
+            bg-gray-50 border rounded-xl text-sm outline-none transition-all duration-200
+            ${error
+              ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100 bg-red-50'
+              : 'border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:bg-white hover:border-blue-300'}
+          `}
+          {...props}
+        />
+        <datalist id={listId}>
+          {options.map((opt) => (
+            <option key={opt} value={opt} />
+          ))}
+        </datalist>
+      </div>
+      {error && (
+        <motion.p
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xs text-red-500 font-medium flex items-center gap-1"
+        >
+          <AlertCircle size={12} /> {error}
+        </motion.p>
+      )}
+    </div>
+  );
+};
 
 const FileUpload = ({ label, name, onChange, file, error, required }) => (
   <div className="flex flex-col gap-1.5 w-full">
@@ -115,6 +165,8 @@ export default function CreateUser() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [availableSubRoles, setAvailableSubRoles] = useState([]);
+  const normalizedRole = String(form.role || "").trim().toLowerCase();
+  const isDoctor = normalizedRole === "doctor";
 
   // Live validation timeouts
   const checkTimeout = useRef(null);
@@ -173,12 +225,20 @@ export default function CreateUser() {
       'mobile', 'password', 'confirm_password', 'photo'
     ];
 
+    if (isDoctor) {
+      requiredKeys.push("experience_years", "qualification", "expertise_area", "certificate_file");
+    }
+
     requiredKeys.forEach(key => {
       if (!form[key]) newErrors[key] = "Required";
     });
 
     if (form.password !== form.confirm_password) {
       newErrors.confirm_password = "Passwords mismatch";
+    }
+
+    if (isDoctor && form.experience_years !== "" && Number(form.experience_years) < 0) {
+      newErrors.experience_years = "Must be 0 or more";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -196,6 +256,9 @@ export default function CreateUser() {
   role: form.role.toLowerCase(),       // ✅ IMPORTANT
   department: form.department,
   specialization: form.specialization || null,
+  experience_years: form.experience_years === "" ? null : form.experience_years,
+  qualification: form.qualification || null,
+  expertise_area: form.expertise_area || null,
   mobile: form.mobile,
   alt_mobile: form.alt_mobile || null,
   join_date: form.join_date,            // ✅ FIXED
@@ -226,6 +289,7 @@ export default function CreateUser() {
       if (form.photo) formData.set("photo", form.photo);
       if (form.government_proof) formData.set("government_proof", form.government_proof);
       if (form.passbook_file) formData.set("passbook_file", form.passbook_file);
+      if (form.certificate_file) formData.set("certificate_file", form.certificate_file);
 
       const res = await apiPost("/api/admin/create-user", formData, {
         headers: { "Content-Type": undefined },
@@ -459,6 +523,42 @@ export default function CreateUser() {
                 </select>
               </div>
             </div>
+
+            <FormInput
+              label="Experience (Years)"
+              name="experience_years"
+              type="number"
+              value={form.experience_years}
+              onChange={handleChange}
+              error={errors.experience_years}
+              required={isDoctor}
+              icon={Briefcase}
+              min={0}
+              placeholder="e.g. 5"
+            />
+
+            <FormInput
+              label="Qualification"
+              name="qualification"
+              value={form.qualification}
+              onChange={handleChange}
+              error={errors.qualification}
+              required={isDoctor}
+              icon={Briefcase}
+              placeholder="e.g. MBBS, MD"
+            />
+
+            <DatalistInput
+              label="Area of Expertise"
+              name="expertise_area"
+              value={form.expertise_area}
+              onChange={handleChange}
+              error={errors.expertise_area}
+              required={isDoctor}
+              icon={Briefcase}
+              options={[...departments, ...availableSubRoles].filter(Boolean)}
+              placeholder="Select or type"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -504,6 +604,16 @@ export default function CreateUser() {
             <FileUpload label="Profile Photo" name="photo" onChange={handleChange} file={form.photo} error={errors.photo} required />
             <FileUpload label="Government Proof" name="government_proof" onChange={handleChange} file={form.government_proof} error={errors.government_proof} />
             <FileUpload label="Passbook Copy" name="passbook_file" onChange={handleChange} file={form.passbook_file} error={errors.passbook_file} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            <FileUpload
+              label="Registration Certificate"
+              name="certificate_file"
+              onChange={handleChange}
+              file={form.certificate_file}
+              error={errors.certificate_file}
+              required={isDoctor}
+            />
           </div>
         </section>
 

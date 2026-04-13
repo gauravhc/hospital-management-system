@@ -3,6 +3,62 @@ const { getConnection, query } = require("../../config/database");
 const { getSchemaMode } = require("../../services/schemaMode.service");
 const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
 
+const HOSPITAL_TYPES = ["Hospital", "Clinic", "Lab", "Pharmacy"];
+const VERIFICATION_STATUSES = ["Pending", "Approved", "Rejected"];
+
+function normalizeHospitalType(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Hospital";
+  const match = HOSPITAL_TYPES.find((t) => t.toLowerCase() === raw.toLowerCase());
+  return match || "Hospital";
+}
+
+function normalizeVerificationStatus(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "Pending";
+  const match = VERIFICATION_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
+  return match || "Pending";
+}
+
+async function insertHospitalRow(connectionOrQuery, payload) {
+  const cols = await getTableColumns("hospitals");
+  if (!cols) throw new Error("Hospitals table not found");
+
+  const values = {};
+  const add = (name, value) => {
+    if (!cols.has(name)) return;
+    values[name] = value;
+  };
+
+  add("name", payload.name);
+  add("address", payload.address || null);
+  add("phone", payload.phone || null);
+  add("email", payload.email || null);
+  add("gst_number", payload.gst_number || null);
+  add("certification", payload.certification || null);
+  add("license_no", payload.license_no || null);
+  add("bed_capacity", payload.bed_capacity ?? 0);
+  add("is_active", payload.is_active !== false);
+  add("website", payload.website || null);
+  add("type_of_hospital", normalizeHospitalType(payload.type_of_hospital || payload.hospital_type));
+  add("license_document", payload.license_document || null);
+  add("verification_status", normalizeVerificationStatus(payload.verification_status));
+
+  const insertCols = Object.keys(values);
+  if (!insertCols.length) throw new Error("No insertable hospital fields found");
+
+  const placeholders = insertCols.map(() => "?").join(", ");
+  const sql = `INSERT INTO hospitals (${insertCols.map((c) => `\`${c}\``).join(", ")}) VALUES (${placeholders})`;
+  const params = insertCols.map((c) => values[c]);
+
+  if (typeof connectionOrQuery.execute === "function") {
+    const [result] = await connectionOrQuery.execute(sql, params);
+    return result;
+  }
+
+  return query(sql, params);
+}
+
 async function list() {
   const mode = await getSchemaMode();
   const orderBy = mode === "legacy" ? "id DESC" : "created_at DESC";
@@ -28,18 +84,7 @@ async function create(payload) {
     try {
       await connection.beginTransaction();
 
-      const [hospitalResult] = await connection.execute(
-        `INSERT INTO hospitals (name, address, phone, gst_number, certification, email)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          payload.name,
-          payload.address || null,
-          payload.phone || null,
-          payload.gst_number || null,
-          payload.certification || null,
-          payload.email || null,
-        ]
-      );
+      const hospitalResult = await insertHospitalRow(connection, payload);
 
       const hospitalId = hospitalResult.insertId;
 
@@ -92,23 +137,7 @@ async function create(payload) {
     }
   }
 
-  const result = await query(
-    `INSERT INTO hospitals (name, address, phone, email, gst_number, certification, license_no, bed_capacity, is_active, website)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      payload.name,
-      payload.address || null,
-      payload.phone || null,
-      payload.email || null,
-      payload.gst_number || null,
-      payload.certification || null,
-      payload.license_no || null,
-      payload.bed_capacity || 0,
-      payload.is_active !== false,
-      payload.website || null,
-    ]
-  );
-
+  const result = await insertHospitalRow(query, payload);
   const hospitalId = result?.insertId || null;
   const rows = hospitalId ? await query(`SELECT * FROM hospitals WHERE id = ?`, [hospitalId]) : [];
   return { hospital_id: hospitalId, hospital: rows[0] || null };
@@ -120,51 +149,61 @@ async function getById(id) {
 }
 
 async function update(id, payload) {
-  const mode = await getSchemaMode();
-  if (mode === "legacy") {
-    return query(
-      `UPDATE hospitals
-       SET name = COALESCE(?, name),
-           address = COALESCE(?, address),
-           phone = COALESCE(?, phone),
-           email = COALESCE(?, email),
-           gst_number = COALESCE(?, gst_number),
-           certification = COALESCE(?, certification)
-       WHERE id = ?`,
-      [
-        payload.name || null,
-        payload.address || null,
-        payload.phone || null,
-        payload.email || null,
-        payload.gst_number || null,
-        payload.certification || null,
-        id,
-      ]
-    );
-  }
+  const cols = await getTableColumns("hospitals");
+  if (!cols) throw new Error("Hospitals table not found");
 
-  return query(
-    `UPDATE hospitals
-     SET name = ?, address = ?, phone = ?, email = ?, gst_number = ?, certification = ?, license_no = ?, bed_capacity = ?, is_active = ?, website = ?
-     WHERE id = ?`,
-    [
-      payload.name,
-      payload.address || null,
-      payload.phone || null,
-      payload.email || null,
-      payload.gst_number || null,
-      payload.certification || null,
-      payload.license_no || null,
-      payload.bed_capacity || 0,
-      payload.is_active !== false,
-      payload.website || null,
-      id,
-    ]
+  const sets = [];
+  const params = [];
+
+  const add = (col, value) => {
+    if (!cols.has(col)) return;
+    sets.push(`\`${col}\` = COALESCE(?, \`${col}\`)`);
+    params.push(value ?? null);
+  };
+
+  add("name", payload.name || null);
+  add("address", payload.address || null);
+  add("phone", payload.phone || null);
+  add("email", payload.email || null);
+  add("gst_number", payload.gst_number || null);
+  add("certification", payload.certification || null);
+  add("license_no", payload.license_no || null);
+  add("bed_capacity", payload.bed_capacity ?? null);
+  add("is_active", typeof payload.is_active === "boolean" ? payload.is_active : null);
+  add("website", payload.website || null);
+  add(
+    "type_of_hospital",
+    payload.type_of_hospital || payload.hospital_type ? normalizeHospitalType(payload.type_of_hospital || payload.hospital_type) : null
   );
+  add("license_document", payload.license_document || null);
+
+  if (!sets.length) return { affectedRows: 0 };
+
+  params.push(id);
+  return query(`UPDATE hospitals SET ${sets.join(", ")} WHERE id = ?`, params);
 }
 
 function remove(id) {
   return query(`DELETE FROM hospitals WHERE id = ?`, [id]);
 }
 
-module.exports = { list, listActive, create, getById, update, remove };
+async function setVerificationStatus(id, status) {
+  const cols = await getTableColumns("hospitals");
+  if (!cols || !cols.has("verification_status")) {
+    throw new Error("Hospitals table missing verification_status column");
+  }
+
+  const next = normalizeVerificationStatus(status);
+  return query(`UPDATE hospitals SET verification_status = ? WHERE id = ?`, [next, id]);
+}
+
+module.exports = {
+  list,
+  listActive,
+  create,
+  getById,
+  update,
+  remove,
+  setVerificationStatus,
+  normalizeVerificationStatus,
+};

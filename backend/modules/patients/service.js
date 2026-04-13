@@ -2,6 +2,25 @@ const { query } = require("../../config/database");
 const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
 const usersService = require("../users/service");
 
+const columnTypeCache = new Map();
+
+async function getColumnType(table, column) {
+  if (!table || !column) return "";
+  const key = `${table}.${column}`;
+  if (columnTypeCache.has(key)) return columnTypeCache.get(key);
+
+  try {
+    const rows = await query(`SHOW COLUMNS FROM \`${table}\` LIKE ?`, [column]);
+    const type = String(rows?.[0]?.Type || "");
+    if (type) {
+      columnTypeCache.set(key, type);
+    }
+    return type;
+  } catch {
+    return "";
+  }
+}
+
 async function resolveTable(candidates = []) {
   for (const table of candidates) {
     const cols = await getTableColumns(table);
@@ -17,12 +36,18 @@ async function list(hospitalId) {
   const patientIdCol = firstExistingColumn(patientCols, ["id", "patient_id"]);
   const patientHospitalCol = firstExistingColumn(patientCols, ["hospital_id"]);
   const nameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
+  const firstNameCol = firstExistingColumn(patientCols, ["first_name", "firstname", "given_name"]);
+  const lastNameCol = firstExistingColumn(patientCols, ["last_name", "lastname", "surname", "family_name"]);
   const phoneCol = firstExistingColumn(patientCols, ["phone", "mobile"]);
   const emailCol = firstExistingColumn(patientCols, ["email"]);
 
   const select = [
     patientIdCol ? `p.\`${patientIdCol}\` AS id` : "p.id AS id",
-    nameCol ? `p.\`${nameCol}\` AS name` : "NULL AS name",
+    nameCol
+      ? `p.\`${nameCol}\` AS name`
+      : firstNameCol || lastNameCol
+        ? `TRIM(CONCAT_WS(' ', ${firstNameCol ? `p.\`${firstNameCol}\`` : "''"}, ${lastNameCol ? `p.\`${lastNameCol}\`` : "''"})) AS name`
+        : "NULL AS name",
     phoneCol ? `p.\`${phoneCol}\` AS phone` : "NULL AS phone",
     emailCol ? `p.\`${emailCol}\` AS email` : "NULL AS email",
     patientHospitalCol ? `p.\`${patientHospitalCol}\` AS hospital_id` : "NULL AS hospital_id",
@@ -44,6 +69,93 @@ async function list(hospitalId) {
   }
   sql += ` ORDER BY p.created_at DESC, p.id DESC`;
 
+  return query(sql, params);
+}
+
+async function search(hospitalId, q, { limit = 20 } = {}) {
+  const patientCols = await getTableColumns("patients");
+  if (!patientCols) return [];
+
+  const patientIdCol = firstExistingColumn(patientCols, ["id", "patient_id"]);
+  if (!patientIdCol) return [];
+
+  const patientHospitalCol = firstExistingColumn(patientCols, ["hospital_id"]);
+  const nameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
+  const firstNameCol = firstExistingColumn(patientCols, ["first_name", "firstname", "given_name"]);
+  const lastNameCol = firstExistingColumn(patientCols, ["last_name", "lastname", "surname", "family_name"]);
+  const phoneCol = firstExistingColumn(patientCols, ["phone", "mobile"]);
+  const emailCol = firstExistingColumn(patientCols, ["email"]);
+  const patientNoCol = firstExistingColumn(patientCols, ["patient_id_no", "patient_no", "patient_code"]);
+
+  const nameExpr = nameCol
+    ? `p.\`${nameCol}\``
+    : firstNameCol || lastNameCol
+      ? `TRIM(CONCAT_WS(' ', ${firstNameCol ? `p.\`${firstNameCol}\`` : "''"}, ${lastNameCol ? `p.\`${lastNameCol}\`` : "''"}))`
+      : "NULL";
+
+  const select = [
+    `p.\`${patientIdCol}\` AS id`,
+    `${nameExpr} AS name`,
+    emailCol ? `p.\`${emailCol}\` AS email` : "NULL AS email",
+    phoneCol ? `p.\`${phoneCol}\` AS phone` : "NULL AS phone",
+    patientHospitalCol ? `p.\`${patientHospitalCol}\` AS hospital_id` : "NULL AS hospital_id",
+  ];
+
+  const whereParts = [];
+  const params = [];
+
+  if (hospitalId !== null && hospitalId !== undefined && patientHospitalCol) {
+    // Include legacy/unassigned rows when hospital_id is nullable.
+    whereParts.push(`(p.\`${patientHospitalCol}\` = ? OR p.\`${patientHospitalCol}\` IS NULL)`);
+    params.push(hospitalId);
+  }
+
+  const raw = String(q || "").trim();
+  if (raw) {
+    const searchLike = `%${raw.toLowerCase()}%`;
+    const orParts = [];
+
+    // Allow searching by patient primary key (UUID or INT) as text.
+    orParts.push(`LOWER(CAST(p.\`${patientIdCol}\` AS CHAR)) LIKE ?`);
+    params.push(searchLike);
+
+    if (nameCol || firstNameCol || lastNameCol) {
+      orParts.push(`LOWER(${nameExpr}) LIKE ?`);
+      params.push(searchLike);
+    }
+
+    if (emailCol) {
+      orParts.push(`LOWER(p.\`${emailCol}\`) LIKE ?`);
+      params.push(searchLike);
+    }
+
+    if (phoneCol) {
+      orParts.push(`LOWER(CAST(p.\`${phoneCol}\` AS CHAR)) LIKE ?`);
+      params.push(searchLike);
+    }
+
+    if (patientNoCol) {
+      orParts.push(`LOWER(CAST(p.\`${patientNoCol}\` AS CHAR)) LIKE ?`);
+      params.push(searchLike);
+    }
+
+    // If a purely numeric input, also allow exact id match for INT ids.
+    if (/^\\d+$/.test(raw)) {
+      orParts.push(`p.\`${patientIdCol}\` = ?`);
+      params.push(Number(raw));
+    }
+
+    if (orParts.length) {
+      whereParts.push(`(${orParts.join(" OR ")})`);
+    }
+  }
+
+  const whereSql = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+  const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+
+  // Prefer created_at if available for better UX on legacy/uuid schemas.
+  const orderCol = patientCols.has("created_at") ? "created_at" : patientIdCol;
+  const sql = `SELECT ${select.join(", ")} FROM patients p ${whereSql} ORDER BY p.\`${orderCol}\` DESC LIMIT ${safeLimit}`;
   return query(sql, params);
 }
 
@@ -103,13 +215,42 @@ async function update(id, payload) {
 
 function remove(id) { return query(`DELETE FROM patients WHERE id = ?`, [id]); }
 
-function appointments(id) {
+async function appointments(id) {
+  const patientCols = (await getTableColumns("patients")) || new Set();
+  const doctorCols = (await getTableColumns("doctors")) || new Set();
+  const departmentCols = await getTableColumns("departments");
+
+  const patientNameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
+  const doctorNameCol = firstExistingColumn(doctorCols, ["full_name", "name"]);
+  const doctorDeptCol = firstExistingColumn(doctorCols, ["department"]);
+  const doctorDeptIdCol = firstExistingColumn(doctorCols, ["department_id"]);
+
+  const joins = [
+    "FROM appointments a",
+    "LEFT JOIN hospitals h ON h.id = a.hospital_id",
+    "LEFT JOIN patients p ON p.id = a.patient_id",
+    "LEFT JOIN doctors d ON d.id = a.doctor_id",
+  ];
+
+  if (!doctorDeptCol && doctorDeptIdCol && departmentCols?.has("id") && departmentCols.has("name")) {
+    joins.push("LEFT JOIN departments dep ON dep.id = d.department_id");
+  }
+
+  const select = [
+    "a.*",
+    "h.name AS hospital_name",
+    patientNameCol ? `p.\`${patientNameCol}\` AS patient_name` : "NULL AS patient_name",
+    doctorNameCol ? `d.\`${doctorNameCol}\` AS doctor_name` : "NULL AS doctor_name",
+    doctorDeptCol
+      ? `d.\`${doctorDeptCol}\` AS doctor_department`
+      : doctorDeptIdCol && departmentCols?.has("name")
+        ? "dep.name AS doctor_department"
+        : "NULL AS doctor_department",
+  ];
+
   return query(
-    `SELECT a.*, h.name AS hospital_name, p.full_name AS patient_name, d.full_name AS doctor_name
-     FROM appointments a
-     LEFT JOIN hospitals h ON h.id = a.hospital_id
-     LEFT JOIN patients p ON p.id = a.patient_id
-     LEFT JOIN doctors d ON d.id = a.doctor_id
+    `SELECT ${select.join(", ")}
+     ${joins.join("\n")}
      WHERE a.patient_id = ?
      ORDER BY a.appointment_date DESC, a.appointment_time DESC`,
     [id]
@@ -151,14 +292,74 @@ async function addMedicalHistory(id, payload = {}, hospitalId = null) {
   const cols = resolved.cols;
   const values = {};
 
+  const toBool = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    const raw = String(value).trim().toLowerCase();
+    if (!raw) return null;
+    if (["yes", "y", "true", "1"].includes(raw)) return true;
+    if (["no", "n", "false", "0"].includes(raw)) return false;
+    return null;
+  };
+
+  const coerceYesNoForColumn = (columnType, value) => {
+    const bool = toBool(value);
+    if (bool === null) return null;
+
+    const type = String(columnType || "").toLowerCase();
+    if (!type) {
+      // Fallback: numeric works for INT and is accepted by many ENUM setups ("1" => first enum value).
+      return bool ? 1 : 0;
+    }
+    if (type.includes("tinyint") || type.includes("int") || type.includes("bit") || type.includes("boolean")) {
+      return bool ? 1 : 0;
+    }
+
+    // For enums/varchars store "Yes"/"No" (or lowercase if the enum is lowercase).
+    const useLower = type.includes("enum(") && type.includes("'yes'") && type.includes("'no'");
+    return useLower ? (bool ? "yes" : "no") : bool ? "Yes" : "No";
+  };
+
+  const normalizeConditionType = (value) => {
+    const raw = String(value ?? "").trim();
+    if (!raw) return null;
+    const allowed = ["Fever", "Diabetes", "BP", "Heart Disease", "Allergy", "Other"];
+    const match = allowed.find((v) => v.toLowerCase() === raw.toLowerCase());
+    return match || "Other";
+  };
+
   values.patient_id = id;
   if (cols.has("hospital_id")) values.hospital_id = hospitalId || null;
 
-  const conditionCol = firstExistingColumn(cols, ["condition", "diagnosis", "chronic_diseases"]);
-  if (conditionCol) values[conditionCol] = payload.condition || payload.diagnosis || payload.chronic_diseases || null;
+  if (cols.has("condition_type")) {
+    values.condition_type = normalizeConditionType(payload.condition_type ?? payload.conditionType);
+  }
+  if (cols.has("has_condition")) {
+    const colType = await getColumnType(resolved.table, "has_condition");
+    values.has_condition = coerceYesNoForColumn(colType, payload.has_condition ?? payload.hasCondition);
+  }
+  if (cols.has("follow_up")) {
+    const colType = await getColumnType(resolved.table, "follow_up");
+    values.follow_up = coerceYesNoForColumn(colType, payload.follow_up ?? payload.followUp);
+  }
+  if (cols.has("emergency_required")) {
+    const colType = await getColumnType(resolved.table, "emergency_required");
+    values.emergency_required = coerceYesNoForColumn(colType, payload.emergency_required ?? payload.emergencyRequired);
+  }
 
-  const medicationsCol = firstExistingColumn(cols, ["medications", "treatment", "medication"]);
-  if (medicationsCol) values[medicationsCol] = payload.medications || payload.treatment || null;
+  const conditionCol = firstExistingColumn(cols, ["condition", "diagnosis", "chronic_diseases"]);
+  if (conditionCol) {
+    values[conditionCol] =
+      payload.condition ||
+      payload.diagnosis ||
+      payload.chronic_diseases ||
+      values.condition_type ||
+      null;
+  }
+
+  const medicationsCol = firstExistingColumn(cols, ["treatment", "medications", "medication"]);
+  if (medicationsCol) values[medicationsCol] = payload.treatment || payload.medications || null;
 
   const allergiesCol = firstExistingColumn(cols, ["allergies", "allergy"]);
   if (allergiesCol) values[allergiesCol] = payload.allergies || null;
@@ -267,8 +468,75 @@ async function deleteDocument(patientId, documentId) {
   return { deleted: 1, fileRef };
 }
 
+async function listLabTests(patientId) {
+  const resolved = await resolveTable(["lab_tests"]);
+  if (!resolved) return [];
+  const cols = resolved.cols;
+
+  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId"]);
+  if (!patientCol) return [];
+
+  const orderCol = cols.has("ordered_at")
+    ? "ordered_at"
+    : cols.has("created_at")
+    ? "created_at"
+    : cols.has("id")
+    ? "id"
+    : null;
+  const orderSql = orderCol ? ` ORDER BY \`${orderCol}\` DESC` : "";
+
+  return query(`SELECT * FROM \`${resolved.table}\` WHERE \`${patientCol}\` = ?${orderSql}`, [patientId]);
+}
+
+async function orderLabTest(patientId, payload = {}) {
+  const resolved = await resolveTable(["lab_tests"]);
+  if (!resolved) throw new Error("lab_tests table not found");
+  const cols = resolved.cols;
+
+  const record = {};
+  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId"]);
+  if (!patientCol) throw new Error("lab_tests schema missing patient_id");
+  record[patientCol] = patientId;
+
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  if (hospitalCol) record[hospitalCol] = payload.hospital_id || null;
+
+  const testNameCol = firstExistingColumn(cols, ["test_name", "name", "test"]);
+  if (testNameCol) record[testNameCol] = payload.test_name || null;
+
+  const testCodeCol = firstExistingColumn(cols, ["test_code", "code"]);
+  if (testCodeCol) record[testCodeCol] = payload.test_code || null;
+
+  const categoryCol = firstExistingColumn(cols, ["category", "department"]);
+  if (categoryCol) record[categoryCol] = payload.category || null;
+
+  const priceCol = firstExistingColumn(cols, ["price", "amount"]);
+  if (priceCol) record[priceCol] = payload.price ?? 0;
+
+  const notesCol = firstExistingColumn(cols, ["notes", "note", "remarks"]);
+  if (notesCol) record[notesCol] = payload.notes || null;
+
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  if (statusCol) record[statusCol] = payload.status || "ordered";
+
+  const orderedAtCol = firstExistingColumn(cols, ["ordered_at"]);
+  if (orderedAtCol) record[orderedAtCol] = new Date();
+
+  const insertCols = Object.keys(record).filter((k) => cols.has(k));
+  const placeholders = insertCols.map(() => "?").join(", ");
+  const values = insertCols.map((k) => record[k]);
+
+  const result = await query(
+    `INSERT INTO \`${resolved.table}\` (${insertCols.map((c) => `\`${c}\``).join(", ")}) VALUES (${placeholders})`,
+    values
+  );
+
+  return { id: result?.insertId ?? null };
+}
+
 module.exports = {
   list,
+  search,
   create,
   getById,
   update,
@@ -281,4 +549,6 @@ module.exports = {
   addMedicalHistory,
   addDocument,
   deleteDocument,
+  listLabTests,
+  orderLabTest,
 };

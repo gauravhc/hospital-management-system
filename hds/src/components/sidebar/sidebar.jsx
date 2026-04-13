@@ -50,7 +50,7 @@ const ROLE_MENUS = {
                 { title: "Profile", href: "/doctor/profile", icon: <FaUserMd size={18} />, subtitle: "My Info" },
                 { title: "Appointments", href: "/doctor/appointments", icon: <FaCalendarAlt size={18} />, subtitle: "Manage" },
                 { title: "Patients", href: "/doctor/patients", icon: <FaUserMd size={18} />, subtitle: "My Patients" },
-                { title: "Assign Task", href: "/doctor/assign-task", icon: <FaUserNurse size={18} />, subtitle: "To Nurse" },
+                { title: "Treatment & Tests", href: "/doctor/assign-task", icon: <FaFileMedical size={18} />, subtitle: "Plan" },
                 { title: "Notifications", href: "/doctor/notifications", icon: <FaShieldAlt size={18} />, subtitle: "Alerts" }, // Added
             ]
         }

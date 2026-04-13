@@ -227,7 +227,7 @@ const createTables = async () => {
         id              VARCHAR(36)   PRIMARY KEY DEFAULT (UUID()),
         hospital_id     VARCHAR(36)   NOT NULL,
         vehicle_no      VARCHAR(50)   NOT NULL UNIQUE,
-        type            ENUM('basic','advanced','air','neonatal') DEFAULT 'basic',
+        type            ENUM('basic','advanced','icu','oxygen','cardiac','air','neonatal') DEFAULT 'basic',
         model           VARCHAR(100),
         year            YEAR,
         driver_name     VARCHAR(150),

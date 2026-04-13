@@ -9,12 +9,14 @@ const path = require("path");
 const { testConnection } = require("./config/database");
 const { ensureErpSchema } = require("./services/bootstrap.service");
 const { notFoundMiddleware, errorMiddleware } = require("./middleware/errorMiddleware");
+const authMiddleware = require("./middleware/authMiddleware");
+const { roleMiddleware } = require("./middleware/roleMiddleware");
 
 const apiRoutes = require("./routes");
 
 const app = express();
 
-for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents")]) {
+for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents"), path.join("uploads", "staff"), path.join("uploads", "hospitals"), path.join("uploads", "insurance")]) {
   fs.mkdirSync(path.join(__dirname, dir), { recursive: true });
 }
 
@@ -32,6 +34,13 @@ app.use(
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Restrict access to hospital license documents.
+app.use(
+  "/uploads/hospitals",
+  authMiddleware,
+  roleMiddleware("super_admin"),
+  express.static(path.join(__dirname, "uploads", "hospitals"), { fallthrough: false })
+);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/", (req, res) => {

@@ -5,6 +5,22 @@ import { useRouter } from "next/navigation";
 import { apiGet, apiPost, apiPut } from "@/services/api";
 
 const toLower = (v) => String(v || "").toLowerCase();
+const safeGetRole = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem("role") || "";
+  } catch {
+    return "";
+  }
+};
+
+const AMBULANCE_TYPE_OPTIONS = [
+  { value: "basic", label: "Basic" },
+  { value: "advanced", label: "Advanced" },
+  { value: "icu", label: "ICU" },
+  { value: "oxygen", label: "With Oxygen" },
+  { value: "cardiac", label: "With Cardiac" },
+];
 
 export default function AmbulanceRequests() {
   const router = useRouter();
@@ -31,7 +47,7 @@ export default function AmbulanceRequests() {
   });
 
   const canManage = useMemo(() => {
-    const role = toLower(localStorage.getItem("role"));
+    const role = toLower(safeGetRole());
     return role === "hospital_admin" || role === "super_admin";
   }, []);
 
@@ -194,9 +210,11 @@ export default function AmbulanceRequests() {
                 onChange={(e) => setNewAmbulance((s) => ({ ...s, type: e.target.value }))}
                 className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold"
               >
-                <option value="basic">Basic</option>
-                <option value="advanced">Advanced</option>
-                <option value="icu">ICU</option>
+                {AMBULANCE_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
               <input
                 value={newAmbulance.driver_phone}

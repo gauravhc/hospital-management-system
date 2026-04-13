@@ -10,15 +10,19 @@ const inputClass =
 
 export default function PatientMedicalHistoryPage() {
   const [form, setForm] = useState({
-    medications: "",
-    condition: "",
-    allergies: "",
-    notes: "",
+    condition_type: "",
+    has_condition: "",
+    follow_up: "No",
+    treatment: "",
+    emergency_required: "No",
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const conditionTypes = ["Fever", "Diabetes", "BP", "Heart Disease", "Allergy", "Other"];
+  const yesNo = ["Yes", "No"];
 
   useEffect(() => {
     const load = async () => {
@@ -26,10 +30,11 @@ export default function PatientMedicalHistoryPage() {
         const response = await apiGet("/api/patients/medical-history");
         if (response?.success) {
           setForm({
-            medications: response.medications || "",
-            condition: response.condition || response.diagnosis || "",
-            allergies: response.allergies || "",
-            notes: response.notes || "",
+            condition_type: response.condition_type || "",
+            has_condition: response.has_condition ? "Yes" : "No",
+            follow_up: response.follow_up ? "Yes" : "No",
+            treatment: response.treatment || "",
+            emergency_required: response.emergency_required ? "Yes" : "No",
           });
         }
       } catch (loadError) {
@@ -45,7 +50,15 @@ export default function PatientMedicalHistoryPage() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name === "has_condition" && value === "No") {
+        next.follow_up = "No";
+        next.treatment = "";
+        next.emergency_required = "No";
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (event) => {
@@ -55,7 +68,19 @@ export default function PatientMedicalHistoryPage() {
     setError("");
 
     try {
-      const response = await apiPost("/api/patients/medical-history", form);
+      const payload = {
+        condition_type: form.condition_type,
+        has_condition: form.has_condition === "Yes",
+        ...(form.has_condition === "Yes"
+          ? {
+              follow_up: form.follow_up,
+              treatment: form.treatment,
+              emergency_required: form.emergency_required,
+            }
+          : {}),
+      };
+
+      const response = await apiPost("/api/patients/medical-history", payload);
       if (!response?.success) {
         throw new Error(response?.message || "Failed to save medical history");
       }
@@ -75,7 +100,7 @@ export default function PatientMedicalHistoryPage() {
           Medical History
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-orange-50">
-          Maintain your allergies, chronic conditions, surgeries, medications, and care notes.
+          Maintain structured medical history details for your conditions.
         </p>
       </div>
 
@@ -100,45 +125,86 @@ export default function PatientMedicalHistoryPage() {
           <>
             <div className="grid gap-5 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Condition</label>
-                <textarea
-                  name="condition"
-                  value={form.condition}
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Condition Type</label>
+                <select
+                  name="condition_type"
+                  value={form.condition_type}
                   onChange={handleChange}
-                  rows={4}
-                  className={`${inputClass} resize-none`}
-                />
+                  className={inputClass}
+                  required
+                >
+                  <option value="" disabled>
+                    Select condition type
+                  </option>
+                  {conditionTypes.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Allergies</label>
-                <textarea
-                  name="allergies"
-                  value={form.allergies}
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Do you have this condition?</label>
+                <select
+                  name="has_condition"
+                  value={form.has_condition}
                   onChange={handleChange}
-                  rows={4}
-                  className={`${inputClass} resize-none`}
-                />
+                  className={inputClass}
+                  required
+                >
+                  <option value="" disabled>
+                    Select Yes/No
+                  </option>
+                  {yesNo.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Medications</label>
-                <textarea
-                  name="medications"
-                  value={form.medications}
-                  onChange={handleChange}
-                  rows={4}
-                  className={`${inputClass} resize-none`}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Notes</label>
-                <textarea
-                  name="notes"
-                  value={form.notes}
-                  onChange={handleChange}
-                  rows={5}
-                  className={`${inputClass} resize-none`}
-                />
-              </div>
+
+              {form.has_condition === "Yes" ? (
+                <>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Follow-up required?</label>
+                    <select name="follow_up" value={form.follow_up} onChange={handleChange} className={inputClass}>
+                      {yesNo.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Emergency consultation required?
+                    </label>
+                    <select
+                      name="emergency_required"
+                      value={form.emergency_required}
+                      onChange={handleChange}
+                      className={inputClass}
+                    >
+                      {yesNo.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Treatment details</label>
+                    <textarea
+                      name="treatment"
+                      value={form.treatment}
+                      onChange={handleChange}
+                      rows={5}
+                      className={`${inputClass} resize-none`}
+                      placeholder="Write treatment details..."
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <div className="mt-6 flex justify-end">

@@ -111,6 +111,18 @@ async function list(req, res) {
   const rows = await service.list(getScopedHospitalId(req));
   return res.json({ success: true, message: "Success", data: rows, patients: rows });
 }
+
+async function search(req, res) {
+  const q = String(req.query?.q || "").trim();
+  if (!q) {
+    return res.json({ success: true, message: "Success", data: [], patients: [] });
+  }
+
+  const rows = await service.search(getScopedHospitalId(req), q, {
+    limit: req.query?.limit,
+  });
+  return res.json({ success: true, message: "Success", data: rows, patients: rows });
+}
 async function register(req, res) {
   const { name, full_name, email, password, phone, gender, address, dob, date_of_birth, blood_group, bloodGroup, state, country, pincode, age } = req.body || {};
   if (!email || !password || !(name || full_name) || !phone) {
@@ -211,20 +223,71 @@ async function getMedicalHistory(req, res) {
   if (!patientId) return res.status(404).json({ success: false, message: "Patient not found" });
   const rows = await service.medicalHistory(patientId);
   const latest = rows[0] || {};
+
+  const normalizeYesNoToBool = (value) => {
+    const raw = String(value ?? "").trim().toLowerCase();
+    if (!raw) return false;
+    return ["yes", "y", "true", "1"].includes(raw);
+  };
+
+  const conditionType =
+    latest.condition_type ||
+    latest.conditionType ||
+    latest.condition ||
+    latest.diagnosis ||
+    "";
+  const hasConditionRaw = latest.has_condition ?? latest.hasCondition;
+  const hasCondition = normalizeYesNoToBool(hasConditionRaw);
+
+  const followUpRaw = latest.follow_up ?? latest.followUp;
+  const emergencyRaw = latest.emergency_required ?? latest.emergencyRequired;
+
   return res.json({
     success: true,
     data: rows,
-    condition: latest.condition || latest.diagnosis || latest.chronic_diseases || "",
-    medications: latest.medications || latest.treatment || "",
-    allergies: latest.allergies || "",
-    notes: latest.notes || "",
+    condition_type: conditionType || "",
+    has_condition: hasCondition,
+    follow_up: normalizeYesNoToBool(followUpRaw),
+    treatment: latest.treatment || latest.medications || "",
+    emergency_required: normalizeYesNoToBool(emergencyRaw),
   });
 }
 
 async function createMedicalHistory(req, res) {
   const patientRow = await resolvePatientRow(req);
   if (!patientRow) return res.status(404).json({ success: false, message: "Patient not found" });
-  await service.addMedicalHistory(patientRow.id, req.body || {}, patientRow.hospital_id || req.user?.hospital_id || null);
+
+  const body = req.body || {};
+  const conditionType = String(body.condition_type ?? body.conditionType ?? "").trim();
+  if (!conditionType) {
+    return res.status(400).json({ success: false, message: "condition_type is required" });
+  }
+
+  const hasConditionRaw = body.has_condition ?? body.hasCondition;
+  const hasConditionStr = String(hasConditionRaw ?? "").trim().toLowerCase();
+  if (!hasConditionStr) {
+    return res.status(400).json({ success: false, message: "has_condition is required" });
+  }
+
+  const hasCondition = ["yes", "y", "true", "1"].includes(hasConditionStr);
+  const toBool = (value) => {
+    const raw = String(value ?? "").trim().toLowerCase();
+    if (!raw) return false;
+    return ["yes", "y", "true", "1"].includes(raw);
+  };
+  const payload = {
+    condition_type: conditionType,
+    has_condition: hasCondition,
+    follow_up: hasCondition ? toBool(body.follow_up ?? body.followUp) : null,
+    treatment: hasCondition ? (body.treatment ?? "") : null,
+    emergency_required: hasCondition ? toBool(body.emergency_required ?? body.emergencyRequired) : null,
+  };
+
+  await service.addMedicalHistory(
+    patientRow.id,
+    payload,
+    patientRow.hospital_id || req.user?.hospital_id || null
+  );
   return res.status(201).json({ success: true, message: "Medical history saved" });
 }
 
@@ -343,8 +406,38 @@ async function listLabReports(req, res) {
   return res.json({ success: true, data: rows, lab_reports: rows });
 }
 
+async function orderLabTest(req, res) {
+  const patientRow = await resolvePatientRow(req);
+  if (!patientRow) return res.status(404).json({ success: false, message: "Patient not found" });
+
+  const body = req.body || {};
+  const testName = String(body.test_name || body.testName || "").trim();
+  if (!testName) {
+    return res.status(400).json({ success: false, message: "test_name is required" });
+  }
+
+  const created = await service.orderLabTest(patientRow.id, {
+    hospital_id: patientRow.hospital_id || req.user?.hospital_id || null,
+    test_name: testName,
+    test_code: body.test_code || body.testCode || null,
+    category: body.category || null,
+    price: body.price ?? null,
+    notes: body.notes || null,
+  });
+
+  return res.status(201).json({ success: true, message: "Lab test booked", data: created });
+}
+
+async function listMyLabTests(req, res) {
+  const patientId = await resolvePatientId(req);
+  if (!patientId) return res.status(404).json({ success: false, message: "Patient not found" });
+  const rows = await service.listLabTests(patientId);
+  return res.json({ success: true, data: rows, lab_tests: rows });
+}
+
 module.exports = {
   list,
+  search,
   register,
   create,
   getById,
@@ -364,4 +457,6 @@ module.exports = {
   listAppointments,
   listBills,
   listLabReports,
+  orderLabTest,
+  listMyLabTests,
 };

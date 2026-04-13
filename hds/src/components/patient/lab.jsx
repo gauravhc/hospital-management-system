@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import useLiveCount from "./useLiveCount";
 import { apiGet } from "@/services/api";
+import { LAB_TEST_CATEGORIES } from "@/data/labTests";
 
 const Hero = ({ pending, claims }) => (
   <div className="rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white p-8 shadow-lg mb-6">
@@ -20,7 +21,7 @@ const Hero = ({ pending, claims }) => (
             href="/patient/lab/order"
             className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-md font-medium"
           >
-            Order a Test
+            Book a Test
           </Link>
           <Link
             href="/patient/lab/results"
@@ -45,14 +46,7 @@ const Hero = ({ pending, claims }) => (
   </div>
 );
 
-const tests = [
-  { id: 1, name: "Full Blood Count (FBC)", price: 250 },
-  { id: 2, name: "Lipid Profile", price: 450 },
-  { id: 3, name: "Thyroid (TSH)", price: 400 },
-  { id: 4, name: "Liver Function Test", price: 500 },
-  { id: 5, name: "Renal Profile", price: 450 },
-  { id: 6, name: "HbA1c", price: 350 },
-];
+const testCategories = LAB_TEST_CATEGORIES;
 
 const PatientLabPage = () => {
   const pending = useLiveCount("/api/lab/reports/pending/count", 15000);
@@ -96,27 +90,34 @@ const PatientLabPage = () => {
                 Available Tests
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {tests.map((t) => (
-                  <div
-                    key={t.id}
-                    className="p-4 border rounded-xl flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-semibold">{t.name}</div>
-                      <div className="text-sm text-slate-500">
-                        Turnaround: 24–48 hrs
-                      </div>
-                    </div>
+              <div className="space-y-6">
+                {testCategories.map((cat) => (
+                  <div key={cat.id}>
+                    <h4 className="text-base font-extrabold text-slate-900">{cat.title}</h4>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {(cat.tests || []).map((t) => (
+                        <div
+                          key={t.id}
+                          className="p-4 border rounded-xl flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="font-semibold">{t.name}</div>
+                            <div className="text-sm text-slate-500">
+                              Turnaround: {t.turnaround || "24–48 hrs"}
+                            </div>
+                          </div>
 
-                    <div className="text-right">
-                      <div className="font-medium">₹{t.price}</div>
-                      <Link
-                        href={`/patient/lab/order?testId=${t.id}`}
-                        className="mt-2 inline-block text-sm text-sky-600"
-                      >
-                        Order
-                      </Link>
+                          <div className="text-right">
+                            <div className="font-medium">₹{t.price}</div>
+                            <Link
+                              href={`/patient/lab/order?testId=${t.id}`}
+                              className="mt-2 inline-block text-sm text-sky-600"
+                            >
+                              Book
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

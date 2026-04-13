@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const authMiddleware = require("../middleware/authMiddleware");
 const { roleMiddleware } = require("../middleware/roleMiddleware");
 const { query } = require("../config/database");
@@ -10,6 +11,7 @@ const { getTableColumns, firstExistingColumn } = require("../services/dbMeta");
 
 const router = express.Router();
 const UPLOAD_ROOT = path.join(__dirname, "..", "uploads");
+fs.mkdirSync(path.join(UPLOAD_ROOT, "staff"), { recursive: true });
 const upload = multer({
   storage: multer.diskStorage({
     destination: path.join(UPLOAD_ROOT, "patients"),
@@ -27,6 +29,9 @@ const staffUpload = multer({
     destination: (req, file, cb) => {
       if (file.fieldname === "photo") {
         return cb(null, path.join(UPLOAD_ROOT, "profile_images"));
+      }
+      if (file.fieldname === "certificate_file") {
+        return cb(null, path.join(UPLOAD_ROOT, "staff"));
       }
       return cb(null, path.join(UPLOAD_ROOT, "staff_documents"));
     },
@@ -200,6 +205,7 @@ router.post(
       { name: "photo", maxCount: 1 },
       { name: "government_proof", maxCount: 1 },
       { name: "passbook_file", maxCount: 1 },
+      { name: "certificate_file", maxCount: 1 },
     ])(req, res, next);
   },
   async (req, res, next) => {
@@ -222,8 +228,27 @@ router.post(
       const photoFile = req.files?.photo?.[0] || null;
       const profileImage = photoFile ? String(photoFile.filename || "").trim() : "";
 
+      const certificate = req.files?.certificate_file?.[0] || null;
+      const certificatePath = certificate ? `staff/${String(certificate.filename || "").trim()}` : "";
+
       if (!role || !email || !fullName || !hospitalId) {
         return res.status(400).json({ success: false, message: "Missing required fields" });
+      }
+
+      if (role === "doctor") {
+        const qualification = String(req.body.qualification || "").trim();
+        const expertiseArea = String(req.body.expertise_area || "").trim();
+        const experienceYearsRaw = req.body.experience_years;
+        const experienceYears = experienceYearsRaw === undefined || experienceYearsRaw === null || experienceYearsRaw === ""
+          ? null
+          : Number(experienceYearsRaw);
+
+        if (!qualification || !expertiseArea || experienceYears === null || Number.isNaN(experienceYears) || experienceYears < 0 || !certificatePath) {
+          return res.status(400).json({
+            success: false,
+            message: "Doctors require qualification, expertise_area, experience_years and certificate_file",
+          });
+        }
       }
 
       // Doctors + Nurses go to their tables; all other hospital staff go to `staff` table.
@@ -251,6 +276,10 @@ router.post(
           password,
           department: req.body.department,
           specialization: req.body.specialization,
+          qualification: req.body.qualification,
+          experience_years: req.body.experience_years,
+          expertise_area: req.body.expertise_area,
+          certificate_file: certificatePath || "",
           profile_image: profileImage || "",
           status: req.body.status || "active",
           hospital_id: hospitalId,
@@ -266,6 +295,7 @@ router.post(
         message: "User created",
         profile_image: profileImage || "",
         profile_image_url: profileImageUrl,
+        certificate_file: certificatePath || "",
       });
     }
 
@@ -478,20 +508,67 @@ router.put("/nurse/update-task/:id", authMiddleware, async (req, res, next) => {
 
 router.post("/register/create", authMiddleware, async (req, res, next) => {
   try {
+    const patientCols = await getTableColumns("patients");
+    if (!patientCols) return res.status(500).json({ success: false, message: "Patients table not found" });
+
+    const patientIdCol = firstExistingColumn(patientCols, ["id", "patient_id"]);
+    const nameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
+    const firstNameCol = firstExistingColumn(patientCols, ["first_name", "firstname", "given_name"]);
+    const lastNameCol = firstExistingColumn(patientCols, ["last_name", "lastname", "surname", "family_name"]);
+    const phoneCol = firstExistingColumn(patientCols, ["phone", "mobile"]);
+    const emailCol = firstExistingColumn(patientCols, ["email"]);
+    const genderCol = firstExistingColumn(patientCols, ["gender"]);
+    const dobCol = firstExistingColumn(patientCols, ["date_of_birth", "dob"]);
+    const statusCol = firstExistingColumn(patientCols, ["status"]);
+
+    const fullName = [req.body.first_name, req.body.last_name].filter(Boolean).join(" ").trim();
+
+    const values = {};
+    if (patientCols.has("hospital_id")) values.hospital_id = req.user.hospital_id || req.body.hospital_id || null;
+    if (firstNameCol) values[firstNameCol] = req.body.first_name || null;
+    if (lastNameCol) values[lastNameCol] = req.body.last_name || null;
+    if (nameCol) values[nameCol] = req.body.name || fullName || null;
+    if (emailCol) values[emailCol] = req.body.email || null;
+    if (phoneCol) values[phoneCol] = req.body.phone || req.body.mobile || null;
+    if (genderCol) values[genderCol] = req.body.gender || null;
+    if (dobCol) values[dobCol] = req.body.date_of_birth || req.body.dob || null;
+    if (statusCol) values[statusCol] = req.body.status || "active";
+
+    const insertCols = Object.keys(values).filter((key) => patientCols.has(key));
+    if (!insertCols.length) {
+      return res.status(500).json({ success: false, message: "No compatible columns found for patients table" });
+    }
+
+    const placeholders = insertCols.map(() => "?").join(", ");
     const result = await query(
-      `INSERT INTO patients (hospital_id, first_name, last_name, email, phone, gender, date_of_birth, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
-      [
-        req.user.hospital_id || req.body.hospital_id,
-        req.body.first_name,
-        req.body.last_name,
-        req.body.email || null,
-        req.body.phone,
-        req.body.gender,
-        req.body.date_of_birth,
-      ]
+      `INSERT INTO patients (${insertCols.map((c) => `\`${c}\``).join(", ")}) VALUES (${placeholders})`,
+      insertCols.map((c) => values[c])
     );
-    const id = result?.insertId || null;
+
+    let id = result?.insertId || null;
+    if (!id && patientIdCol && (values[emailCol] || values[phoneCol])) {
+      const whereParts = [];
+      const params = [];
+      if (emailCol && values[emailCol]) {
+        whereParts.push(`\`${emailCol}\` = ?`);
+        params.push(values[emailCol]);
+      }
+      if (phoneCol && values[phoneCol]) {
+        whereParts.push(`\`${phoneCol}\` = ?`);
+        params.push(values[phoneCol]);
+      }
+
+      const createdAtCol = patientCols.has("created_at") ? "created_at" : null;
+      const orderCol = createdAtCol || (patientCols.has(patientIdCol) ? patientIdCol : null);
+      const orderSql = orderCol ? ` ORDER BY \`${orderCol}\` DESC` : "";
+
+      const rows = await query(
+        `SELECT \`${patientIdCol}\` AS id FROM patients WHERE ${whereParts.join(" OR ")}${orderSql} LIMIT 1`,
+        params
+      );
+      id = rows?.[0]?.id || null;
+    }
+
     res.status(201).json({ success: true, message: "Patient created", id, patient: { id } });
   } catch (error) {
     next(error);
@@ -565,6 +642,7 @@ router.post("/appointments/book", authMiddleware, async (req, res, next) => {
       if (appointmentId) {
         const sendWhatsApp = require("../utils/whatsapp");
         const appointmentService = require("../modules/appointments/service");
+        const { notifyAppointmentBooked } = require("../modules/notifications/appointmentEvents");
         const appt = await appointmentService.getById(appointmentId);
 
         const patientName = appt?.patient_name || appt?.patientName || "Patient";
@@ -579,6 +657,9 @@ router.post("/appointments/book", authMiddleware, async (req, res, next) => {
         } else {
           console.warn("WhatsApp skipped: patient phone not found for appointment", appointmentId);
         }
+
+        // In-app notifications (patient + doctor)
+        await notifyAppointmentBooked(appt);
       }
     } catch (err) {
       console.error("WhatsApp notification skipped:", err?.message || err);
@@ -596,7 +677,21 @@ router.post("/appointments/book", authMiddleware, async (req, res, next) => {
 
 router.put("/appointments/status/:id", authMiddleware, async (req, res, next) => {
   try {
+    const appointmentService = require("../modules/appointments/service");
+    const { notifyAppointmentStatusChanged } = require("../modules/notifications/appointmentEvents");
+
+    const before = await appointmentService.getById(req.params.id);
+    const oldStatus = before?.status ?? null;
+
     await query(`UPDATE appointments SET status = ? WHERE id = ?`, [req.body.status, req.params.id]);
+
+    try {
+      if (before && req.body.status) {
+        await notifyAppointmentStatusChanged({ ...before, status: req.body.status }, oldStatus, req.body.status);
+      }
+    } catch (err) {
+      console.error("Appointment notification skipped:", err?.message || err);
+    }
     res.json({ success: true, message: "Appointment status updated" });
   } catch (error) {
     next(error);
@@ -1252,7 +1347,21 @@ router.patch("/appointments/update/:id", authMiddleware, async (req, res, next) 
 
 router.patch("/appointments/cancel/:id", authMiddleware, async (req, res, next) => {
   try {
+    const appointmentService = require("../modules/appointments/service");
+    const { notifyAppointmentStatusChanged } = require("../modules/notifications/appointmentEvents");
+
+    const before = await appointmentService.getById(req.params.id);
+    const oldStatus = before?.status ?? null;
+
     await query(`UPDATE appointments SET status = 'cancelled' WHERE id = ?`, [req.params.id]);
+
+    try {
+      if (before) {
+        await notifyAppointmentStatusChanged({ ...before, status: "cancelled" }, oldStatus, "cancelled");
+      }
+    } catch (err) {
+      console.error("Appointment notification skipped:", err?.message || err);
+    }
     res.json({ success: true, message: "Appointment cancelled" });
   } catch (error) {
     next(error);

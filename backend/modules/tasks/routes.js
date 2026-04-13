@@ -8,6 +8,6 @@ const router = express.Router();
 router.use(authMiddleware, hospitalScope);
 
 router.post("/assign", asyncHandler(controller.assign));
+router.get("/patient/:patientId", asyncHandler(controller.patientHistory));
 
 module.exports = router;
-

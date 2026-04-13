@@ -2,6 +2,7 @@ const service = require("./service");
 const { ok, getScopedHospitalId } = require("../../services/module.helper");
 const { query } = require("../../config/database");
 const sendWhatsApp = require("../../utils/whatsapp");
+const { notifyAppointmentBooked, notifyAppointmentStatusChanged } = require("../notifications/appointmentEvents");
 
 function normalizeAppointment(row) {
   if (!row) return row;
@@ -97,6 +98,9 @@ async function create(req, res) {
       } else {
         console.warn("WhatsApp skipped: patient phone not found for appointment", appointmentId);
       }
+
+      // In-app notifications (patient + doctor)
+      await notifyAppointmentBooked(appointment);
     } catch (err) {
       // WhatsApp failures must not break appointment creation.
       console.error("WhatsApp notification skipped:", err?.message || err);
@@ -111,7 +115,24 @@ async function getById(req, res) {
   const normalized = normalizeAppointment(row);
   return res.json({ success: true, message: "Success", data: normalized, appointment: normalized });
 }
-async function update(req, res) { await service.update(req.params.id, req.body); return ok(res, null, "Appointment updated"); }
+async function update(req, res) {
+  const id = req.params.id;
+  const before = await service.getById(id);
+  const oldStatus = before?.status ?? null;
+
+  await service.update(id, req.body);
+
+  const newStatus = req.body?.status ?? null;
+  if (before && newStatus) {
+    try {
+      await notifyAppointmentStatusChanged({ ...before, status: newStatus }, oldStatus, newStatus);
+    } catch (err) {
+      console.error("Appointment notification skipped:", err?.message || err);
+    }
+  }
+
+  return ok(res, null, "Appointment updated");
+}
 async function remove(req, res) { await service.remove(req.params.id); return ok(res, null, "Appointment deleted"); }
 async function byDoctor(req, res) {
   const rows = await service.byDoctor(req.params.doctorId);
