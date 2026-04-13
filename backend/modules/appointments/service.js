@@ -1,5 +1,5 @@
 const { query } = require("../../config/database");
-const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
+const { getTableColumns, firstExistingColumn, getHospitalColumn } = require("../../services/dbMeta");
 
 let cachedSelectSql = null;
 let cachedSelectSqlBuiltAt = 0;
@@ -10,6 +10,7 @@ async function buildSelectSql() {
 
   const patientCols = (await getTableColumns("patients")) || new Set();
   const doctorCols = (await getTableColumns("doctors")) || new Set();
+  const appointmentCols = (await getTableColumns("appointments")) || new Set();
 
   const patientFullNameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
   const patientFirstNameCol = firstExistingColumn(patientCols, ["first_name"]);
@@ -35,9 +36,11 @@ async function buildSelectSql() {
     ? `CONCAT_WS(' ', ${doctorFirstNameCol ? `d.\`${doctorFirstNameCol}\`` : "NULL"}, ${doctorLastNameCol ? `d.\`${doctorLastNameCol}\`` : "NULL"})`
     : "NULL";
 
+  const appointmentHospitalCol = firstExistingColumn(appointmentCols, ["hospital_id", "hospitalId"]);
+
   const select = [
     "a.*",
-    "h.name AS hospital_name",
+    appointmentHospitalCol ? "h.name AS hospital_name" : "NULL AS hospital_name",
     `${patientNameExpr} AS patient_name`,
     `${doctorNameExpr} AS doctor_name`,
     patientEmailCol ? `p.\`${patientEmailCol}\` AS patient_email` : "NULL AS patient_email",
@@ -48,7 +51,7 @@ async function buildSelectSql() {
 
   cachedSelectSql = `SELECT ${select.join(", ")}
     FROM appointments a
-    LEFT JOIN hospitals h ON h.id = a.hospital_id
+    ${appointmentHospitalCol ? `LEFT JOIN hospitals h ON h.id = a.\`${appointmentHospitalCol}\`` : ""}
     LEFT JOIN patients p ON p.id = a.patient_id
     LEFT JOIN doctors d ON d.id = a.doctor_id`;
   cachedSelectSqlBuiltAt = Date.now();
@@ -66,7 +69,8 @@ async function selectSql(where = "", params = []) {
 }
 
 async function list(hospitalId) {
-  return hospitalId ? selectSql(`WHERE a.hospital_id = ?`, [hospitalId]) : selectSql();
+  const hospitalCol = await getHospitalColumn("appointments");
+  return hospitalId && hospitalCol ? selectSql(`WHERE a.\`${hospitalCol}\` = ?`, [hospitalId]) : selectSql();
 }
 
 function create(payload, hospitalId) {

@@ -6,6 +6,7 @@ const NAV_ITEMS = [
     { name: "Dashboard", href: "/doctor" },
     { name: "Appointments", href: "/doctor/appointments" },
     { name: "Patients", href: "/doctor/patients" },
+    { name: "Lab Reports", href: "/doctor/lab-reports" },
     { name: "Notifications", href: "/doctor/notifications" },
 ];
 

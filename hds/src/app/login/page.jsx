@@ -1,11 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
-import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/api";
+
+const normalizeRole = (value) => {
+  const rawRole = String(value || "").trim().toLowerCase();
+
+  if (rawRole === "administrator" || rawRole === "admin") return "hospital_admin";
+  if (rawRole === "superadmin" || rawRole === "super-admin") return "super_admin";
+  if (
+    rawRole === "reception" ||
+    rawRole === "receptionist" ||
+    rawRole === "register"
+  ) {
+    return "register";
+  }
+  if (rawRole === "labtechnician" || rawRole === "lab_technician") return "lab";
+  if (rawRole === "inventorymanager" || rawRole === "inventory_manager" || rawRole === "inventory") return "inventory";
+  if (rawRole === "hrmanager" || rawRole === "hr_manager" || rawRole === "hr") return "hr";
+
+  return rawRole;
+};
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -31,15 +50,11 @@ export default function LoginPage() {
         throw new Error("Invalid login response");
       }
 
-      let role = response.user.role;
-
-      // Normalize roles
-      if (role === "administrator" || role === "admin") role = "hospital_admin";
-      if (role === "superadmin" || role === "super-admin") role = "super_admin";
+      const normalizedRole = normalizeRole(response.user.role);
 
       login({
         token: response.token,
-        role,
+        role: normalizedRole,
         username: response.user.email,
         email: response.user.email,
         id: response.user.id,
@@ -49,32 +64,43 @@ export default function LoginPage() {
         profile_image_url: response.user.profile_image_url,
       });
 
-      // ✅ Redirect ONLY HERE
-      switch (role) {
-
-  case "super_admin":
-    router.replace("/super-admin");
-    break;
-
-  case "hospital_admin":
-    router.replace("/admin");
-    break;
-
-  case "doctor":
-    router.replace("/doctor");
-    break;
-
-  case "nurse":
-    router.replace("/nurse");
-    break;
-
-  case "patient":
-    router.replace("/patient");
-    break;
-
-  default:
-    router.replace("/");
-}
+      switch (normalizedRole) {
+        case "super_admin":
+          router.replace("/super-admin");
+          break;
+        case "hospital_admin":
+          router.replace("/admin");
+          break;
+        case "doctor":
+          router.replace("/doctor");
+          break;
+        case "lab":
+          router.replace("/lab");
+          break;
+        case "pharmacist":
+          router.replace("/pharmacy");
+          break;
+        case "nurse":
+          router.replace("/nurse");
+          break;
+        case "patient":
+          router.replace("/patient");
+          break;
+        case "inventory":
+          router.replace("/inventory");
+          break;
+        case "register":
+          router.replace("/register");
+          break;
+        case "accountant":
+          router.replace("/accountant");
+          break;
+        case "hr":
+          router.replace("/hr");
+          break;
+        default:
+          router.replace("/");
+      }
     } catch (err) {
       console.error("Login Error:", err);
       setMessage(
@@ -141,12 +167,12 @@ export default function LoginPage() {
               disabled={isLoading}
               className="w-full bg-blue-600 text-white py-3 rounded-lg"
             >
-              {isLoading ? <Loader2 className="animate-spin" /> : "Sign In"}
+              {isLoading ? <Loader2 className="mx-auto animate-spin" /> : "Sign In"}
             </button>
           </form>
 
           <p className="text-sm text-center">
-            Don’t have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-blue-600 font-semibold">
               Sign up
             </Link>

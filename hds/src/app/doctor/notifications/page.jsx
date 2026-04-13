@@ -48,6 +48,7 @@ export default function DoctorNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [appointments, setAppointments] = useState([]);
+  const [labReports, setLabReports] = useState([]);
   const [tick, setTick] = useState(Date.now());
 
   const doctorUserId = useMemo(() => {
@@ -65,12 +66,22 @@ export default function DoctorNotificationsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiGet("/api/appointments", { role: "doctor", userId: doctorUserId });
-      const list = Array.isArray(res?.appointments) ? res.appointments : Array.isArray(res?.data) ? res.data : [];
+      const [appointmentRes, labReportRes] = await Promise.all([
+        apiGet("/api/appointments", { role: "doctor", userId: doctorUserId }),
+        apiGet("/api/lab/reports", { doctor_id: doctorUserId }),
+      ]);
+      const list = Array.isArray(appointmentRes?.appointments)
+        ? appointmentRes.appointments
+        : Array.isArray(appointmentRes?.data)
+        ? appointmentRes.data
+        : [];
+      const reportList = Array.isArray(labReportRes?.data) ? labReportRes.data : [];
       setAppointments(list);
+      setLabReports(reportList);
     } catch (err) {
       setError(err?.message || "Failed to load notifications.");
       setAppointments([]);
+      setLabReports([]);
     } finally {
       setLoading(false);
     }
@@ -93,7 +104,7 @@ export default function DoctorNotificationsPage() {
   const notifications = useMemo(() => {
     const now = new Date(tick);
     const windowMinutes = 24 * 60;
-    const items = (appointments || [])
+    const appointmentItems = (appointments || [])
       .map((appt) => {
         const dt = buildLocalDateTime(appt.date || appt.appointment_date, appt.time || appt.appointment_time);
         return { appt, dt };
@@ -114,16 +125,38 @@ export default function DoctorNotificationsPage() {
         const patientName = appt.patientName || appt.patient_name || appt.patient || "Patient";
         return {
           id: String(appt.id || appt.appointment_id || ""),
+          createdAt: dt?.getTime?.() || 0,
           diffMinutes,
           title: diffMinutes <= 5 && diffMinutes >= -5 ? "You have an appointment now" : "Upcoming appointment",
           message: `You have an appointment with ${patientName} at ${timeStr} on ${dateStr}.`,
           when: formatRelativeMinutes(diffMinutes),
           href: appt.id ? `/doctor/appointments/${appt.id}` : "/doctor/appointments",
+          kind: "appointment",
         };
       });
 
-    return items;
-  }, [appointments, tick]);
+    const labItems = (labReports || [])
+      .filter((report) => {
+        const status = String(report?.status || "").toLowerCase();
+        return status === "final" || status === "completed";
+      })
+      .slice(0, 10)
+      .map((report) => ({
+        id: `lab-${report.id || report.patient_id || Math.random()}`,
+        createdAt: new Date(report.created_at || report.updated_at || Date.now()).getTime(),
+        title: "New lab report uploaded",
+        message: `Lab report for ${report.patient_name || `patient #${report.patient_id || "--"}`} is ready to review.`,
+        when: normalizeDate(report.created_at || report.updated_at) || "Recently uploaded",
+        href: "/doctor/lab-reports",
+        kind: "lab",
+      }));
+
+    return [...appointmentItems, ...labItems].sort((a, b) => {
+      if (a.kind === "lab" && b.kind !== "lab") return -1;
+      if (a.kind !== "lab" && b.kind === "lab") return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  }, [appointments, labReports, tick]);
 
   return (
     <div className="space-y-6">
@@ -132,7 +165,7 @@ export default function DoctorNotificationsPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Doctor Notifications</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Alerts are generated from your scheduled appointments (next 24 hours).
+              Alerts are generated from your scheduled appointments and newly uploaded lab reports.
             </p>
           </div>
           <button
@@ -159,8 +192,8 @@ export default function DoctorNotificationsPage() {
             <Bell size={18} className="text-sky-600" />
             <h2 className="text-lg font-bold text-slate-900">Alerts</h2>
           </div>
-          <Link href="/doctor/appointments" className="text-sm font-semibold text-sky-700 hover:underline">
-            View appointments
+          <Link href="/doctor/lab-reports" className="text-sm font-semibold text-sky-700 hover:underline">
+            View lab reports
           </Link>
         </div>
 
@@ -189,7 +222,7 @@ export default function DoctorNotificationsPage() {
                       </span>
                       <span className="inline-flex items-center gap-1">
                         <Calendar size={14} />
-                        Scheduled
+                        {n.kind === "lab" ? "Lab update" : "Scheduled"}
                       </span>
                     </div>
                   </div>

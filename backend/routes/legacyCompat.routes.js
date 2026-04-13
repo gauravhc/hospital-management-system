@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const authMiddleware = require("../middleware/authMiddleware");
 const { roleMiddleware } = require("../middleware/roleMiddleware");
-const { query } = require("../config/database");
+const { query, getConnection } = require("../config/database");
 const usersService = require("../modules/users/service");
 const { getSchemaMode } = require("../services/schemaMode.service");
 const { getTableColumns, firstExistingColumn } = require("../services/dbMeta");
@@ -75,6 +75,15 @@ async function resolveDoctorByUser(user) {
     [user.email, user.phone || ""]
   );
   return rows[0] || null;
+}
+
+async function resolveValidHospitalId(candidate) {
+  if (candidate === null || candidate === undefined || candidate === "") return null;
+  const hospitalId = Number(candidate);
+  if (!Number.isInteger(hospitalId) || hospitalId <= 0) return null;
+
+  const rows = await query(`SELECT id FROM hospitals WHERE id = ? LIMIT 1`, [hospitalId]);
+  return rows[0]?.id || null;
 }
 
 function unwrap(rows) {
@@ -508,6 +517,7 @@ router.put("/nurse/update-task/:id", authMiddleware, async (req, res, next) => {
 
 router.post("/register/create", authMiddleware, async (req, res, next) => {
   try {
+<<<<<<< HEAD
     const patientCols = await getTableColumns("patients");
     if (!patientCols) return res.status(500).json({ success: false, message: "Patients table not found" });
 
@@ -570,6 +580,79 @@ router.post("/register/create", authMiddleware, async (req, res, next) => {
     }
 
     res.status(201).json({ success: true, message: "Patient created", id, patient: { id } });
+=======
+    const patientsService = require("../modules/patients/service");
+
+    const fullName = String(
+      req.body.name ||
+        req.body.full_name ||
+        [req.body.first_name, req.body.last_name].filter(Boolean).join(" ")
+    ).trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const phone = String(
+      req.body.mobile ||
+        req.body.phone ||
+        req.body.primaryPhone ||
+        ""
+    ).trim();
+
+    if (!fullName || !email || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: "name, email and phone are required",
+      });
+    }
+
+    const scopedHospitalId = await resolveValidHospitalId(
+      req.user.hospital_id || req.body.hospital_id || null
+    );
+
+    const created = await usersService.create(
+      {
+        role: "patient",
+        name: fullName,
+        email,
+        phone,
+        password: req.body.password || phone || "Patient@123",
+        gender: req.body.gender,
+        address: req.body.address,
+        dob: req.body.dob || req.body.date_of_birth,
+        date_of_birth: req.body.date_of_birth || req.body.dob,
+        blood_group: req.body.blood_group || req.body.bloodGroup,
+        state: req.body.state,
+        country: req.body.country,
+        pincode: req.body.pincode,
+        age: req.body.age,
+        status: "active",
+      },
+      scopedHospitalId
+    );
+
+    const patient = await patientsService.getById(created.id);
+
+    res.status(201).json({
+      success: true,
+      message: "Patient created",
+      patient: patient
+        ? {
+            ...patient,
+            patient_id: patient.patient_id || patient.patient_id_no || patient.id,
+            name: patient.full_name || patient.name || fullName,
+            full_name: patient.full_name || patient.name || fullName,
+            mobile: patient.mobile || patient.phone || phone,
+            phone: patient.phone || patient.mobile || phone,
+          }
+        : {
+            id: created.id,
+            patient_id: created.id,
+            name: fullName,
+            full_name: fullName,
+            email,
+            mobile: phone,
+            phone,
+          },
+    });
+>>>>>>> 7fdfd7e (committing the changes)
   } catch (error) {
     next(error);
   }
@@ -580,13 +663,39 @@ router.post("/register/create-appointment", authMiddleware, async (req, res, nex
     const { getTableColumns, firstExistingColumn } = require("../services/dbMeta");
     const cols = await getTableColumns("appointments");
     if (!cols) return res.status(500).json({ success: false, message: "Appointments table not found" });
+    const patientCols = await getTableColumns("patients");
+
+    let resolvedPatientId = req.body.patient_id ?? null;
+    if (patientCols && resolvedPatientId != null) {
+      const patientIdCol = firstExistingColumn(patientCols, ["id"]);
+      const externalPatientIdCol = firstExistingColumn(patientCols, ["patient_id", "patient_id_no"]);
+      if (patientIdCol || externalPatientIdCol) {
+        const patientRows = await query(
+          `SELECT id, hospital_id
+             FROM patients
+            WHERE ${[patientIdCol ? `\`${patientIdCol}\` = ?` : null, externalPatientIdCol ? `\`${externalPatientIdCol}\` = ?` : null]
+              .filter(Boolean)
+              .join(" OR ")}
+            ORDER BY id DESC
+            LIMIT 1`,
+          [resolvedPatientId, resolvedPatientId].slice(0, [patientIdCol, externalPatientIdCol].filter(Boolean).length)
+        );
+        if (patientRows[0]?.id) {
+          resolvedPatientId = patientRows[0].id;
+        }
+      }
+    }
+
+    const resolvedHospitalId = req.user.hospital_id ?? req.body.hospital_id ?? null;
+    const resolvedDate = req.body.appointment_date ?? req.body.date ?? null;
+    const resolvedTime = req.body.appointment_time ?? req.body.time ?? null;
 
     const payload = {
-      hospital_id: req.user.hospital_id || req.body.hospital_id,
-      patient_id: req.body.patient_id,
-      doctor_id: req.body.doctor_id,
-      appointment_date: req.body.appointment_date,
-      appointment_time: req.body.appointment_time,
+      hospital_id: resolvedHospitalId,
+      patient_id: resolvedPatientId,
+      doctor_id: req.body.doctor_id ?? null,
+      appointment_date: resolvedDate,
+      appointment_time: resolvedTime,
       status: "scheduled",
     };
 
@@ -594,7 +703,7 @@ router.post("/register/create-appointment", authMiddleware, async (req, res, nex
     if (typeCol) payload[typeCol] = req.body.type || "consultation";
 
     const complaintCol = firstExistingColumn(cols, ["chief_complaint", "comments", "reason", "notes"]);
-    if (complaintCol) payload[complaintCol] = req.body.chief_complaint || req.body.reason || req.body.comments || null;
+    if (complaintCol) payload[complaintCol] = req.body.chief_complaint || req.body.reason || req.body.comments || req.body.symptoms || req.body.notes || null;
 
     const insertCols = Object.keys(payload).filter((key) => cols.has(key));
     const placeholders = insertCols.map(() => "?").join(", ");
@@ -613,13 +722,39 @@ router.post("/appointments/book", authMiddleware, async (req, res, next) => {
     const { getTableColumns, firstExistingColumn } = require("../services/dbMeta");
     const cols = await getTableColumns("appointments");
     if (!cols) return res.status(500).json({ success: false, message: "Appointments table not found" });
+    const patientCols = await getTableColumns("patients");
+
+    let resolvedPatientId = req.body.patient_id ?? null;
+    if (patientCols && resolvedPatientId != null) {
+      const patientIdCol = firstExistingColumn(patientCols, ["id"]);
+      const externalPatientIdCol = firstExistingColumn(patientCols, ["patient_id", "patient_id_no"]);
+      if (patientIdCol || externalPatientIdCol) {
+        const patientRows = await query(
+          `SELECT id, hospital_id
+             FROM patients
+            WHERE ${[patientIdCol ? `\`${patientIdCol}\` = ?` : null, externalPatientIdCol ? `\`${externalPatientIdCol}\` = ?` : null]
+              .filter(Boolean)
+              .join(" OR ")}
+            ORDER BY id DESC
+            LIMIT 1`,
+          [resolvedPatientId, resolvedPatientId].slice(0, [patientIdCol, externalPatientIdCol].filter(Boolean).length)
+        );
+        if (patientRows[0]?.id) {
+          resolvedPatientId = patientRows[0].id;
+        }
+      }
+    }
+
+    const resolvedHospitalId = req.user.hospital_id ?? req.body.hospital_id ?? null;
+    const resolvedDate = req.body.appointment_date ?? req.body.date ?? null;
+    const resolvedTime = req.body.appointment_time ?? req.body.time ?? null;
 
     const payload = {
-      hospital_id: req.user.hospital_id || req.body.hospital_id,
-      patient_id: req.body.patient_id,
-      doctor_id: req.body.doctor_id,
-      appointment_date: req.body.appointment_date,
-      appointment_time: req.body.appointment_time,
+      hospital_id: resolvedHospitalId,
+      patient_id: resolvedPatientId,
+      doctor_id: req.body.doctor_id ?? null,
+      appointment_date: resolvedDate,
+      appointment_time: resolvedTime,
       status: "scheduled",
     };
 
@@ -627,7 +762,7 @@ router.post("/appointments/book", authMiddleware, async (req, res, next) => {
     if (typeCol) payload[typeCol] = req.body.type || "consultation";
 
     const complaintCol = firstExistingColumn(cols, ["chief_complaint", "comments", "reason", "notes"]);
-    if (complaintCol) payload[complaintCol] = req.body.reason || req.body.chief_complaint || req.body.comments || null;
+    if (complaintCol) payload[complaintCol] = req.body.reason || req.body.chief_complaint || req.body.comments || req.body.symptoms || req.body.notes || null;
 
     const insertCols = Object.keys(payload).filter((key) => cols.has(key));
     const placeholders = insertCols.map(() => "?").join(", ");
@@ -1095,24 +1230,57 @@ router.post("/appointments/request-lab-test/:id", authMiddleware, async (req, re
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
     const appointment = appointmentRows[0];
+    const doctorRows = appointment.doctor_id
+      ? await query(`SELECT * FROM doctors WHERE id = ? LIMIT 1`, [appointment.doctor_id])
+      : [];
+    const doctor = doctorRows[0] || null;
+    const resolvedHospitalId = appointment.hospital_id ?? req.user?.hospital_id ?? doctor?.hospital_id ?? null;
+
+    if (appointment.hospital_id == null && resolvedHospitalId != null) {
+      await query(`UPDATE appointments SET hospital_id = ? WHERE id = ?`, [resolvedHospitalId, appointment.id]);
+      appointment.hospital_id = resolvedHospitalId;
+    }
+
     const tests = Array.isArray(req.body.tests) ? req.body.tests : [];
     if (!tests.length) {
       return res.status(400).json({ success: false, message: "No tests provided" });
     }
 
+    const labOrderCols = await getTableColumns("lab_orders");
+    if (!labOrderCols) {
+      return res.status(500).json({ success: false, message: "Lab orders table not available" });
+    }
+
+    const valuesTemplate = {
+      hospital_id: firstExistingColumn(labOrderCols, ["hospital_id", "hospitalId"]),
+      appointment_id: firstExistingColumn(labOrderCols, ["appointment_id", "appointmentId"]),
+      patient_id: firstExistingColumn(labOrderCols, ["patient_id", "patientId"]),
+      doctor_id: firstExistingColumn(labOrderCols, ["doctor_id", "doctorId"]),
+      test_name: firstExistingColumn(labOrderCols, ["test_name", "testName", "title"]),
+      notes: firstExistingColumn(labOrderCols, ["notes", "comment", "comments", "description"]),
+      status: firstExistingColumn(labOrderCols, ["status"]),
+    };
+
     for (const test of tests) {
+      const insertValues = {};
+
+      if (valuesTemplate.hospital_id) insertValues[valuesTemplate.hospital_id] = resolvedHospitalId;
+      if (valuesTemplate.appointment_id) insertValues[valuesTemplate.appointment_id] = appointment.id;
+      if (valuesTemplate.patient_id) insertValues[valuesTemplate.patient_id] = appointment.patient_id ?? null;
+      if (valuesTemplate.doctor_id) insertValues[valuesTemplate.doctor_id] = appointment.doctor_id ?? null;
+      if (valuesTemplate.test_name) insertValues[valuesTemplate.test_name] = test;
+      if (valuesTemplate.notes) insertValues[valuesTemplate.notes] = req.body.notes || null;
+      if (valuesTemplate.status) insertValues[valuesTemplate.status] = "pending";
+
+      const insertColumns = Object.keys(insertValues);
+      if (!insertColumns.length) {
+        return res.status(500).json({ success: false, message: "Lab orders table is missing required columns" });
+      }
+
       await query(
-        `INSERT INTO lab_orders (hospital_id, appointment_id, patient_id, doctor_id, test_name, notes, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          appointment.hospital_id,
-          appointment.id,
-          appointment.patient_id,
-          appointment.doctor_id,
-          test,
-          req.body.notes || null,
-          "pending",
-        ]
+        `INSERT INTO lab_orders (${insertColumns.map((col) => `\`${col}\``).join(", ")})
+         VALUES (${insertColumns.map(() => "?").join(", ")})`,
+        insertColumns.map((col) => insertValues[col])
       );
     }
 
@@ -1124,21 +1292,79 @@ router.post("/appointments/request-lab-test/:id", authMiddleware, async (req, re
 
 router.get("/lab/appointment/:appointmentId", authMiddleware, async (req, res, next) => {
   try {
+    const appointmentRows = await query(`SELECT * FROM appointments WHERE id = ? LIMIT 1`, [req.params.appointmentId]);
+    const appointment = appointmentRows[0] || null;
+    const labOrderCols = await getTableColumns("lab_orders");
+    const labReportCols = await getTableColumns("lab_reports");
+    const appointmentRefCol = firstExistingColumn(labOrderCols, ["appointment_id", "appointmentId"]);
+    const orderPatientCol = firstExistingColumn(labOrderCols, ["patient_id", "patientId"]);
+    const orderDoctorCol = firstExistingColumn(labOrderCols, ["doctor_id", "doctorId"]);
+    const orderIdCol = firstExistingColumn(labOrderCols, ["id"]);
+    const testNameCol = firstExistingColumn(labOrderCols, ["test_name", "testName", "title"]);
+    const notesCol = firstExistingColumn(labOrderCols, ["notes", "comment", "comments", "description"]);
+    const statusCol = firstExistingColumn(labOrderCols, ["status"]);
+    const sortCol = firstExistingColumn(labOrderCols, ["created_at", "updated_at", "id"]);
+    const reportUrlCol = firstExistingColumn(labReportCols, ["report_url", "file_url", "result"]);
+    const reportOrderRefCol = firstExistingColumn(labReportCols, ["lab_order_id", "labOrderId", "test_id"]);
+    const reportAppointmentRefCol = firstExistingColumn(labReportCols, ["appointment_id", "appointmentId"]);
+    const reportPatientCol = firstExistingColumn(labReportCols, ["patient_id", "patientId"]);
+    const reportDoctorCol = firstExistingColumn(labReportCols, ["doctor_id", "doctorId"]);
+    const reportSortCol = firstExistingColumn(labReportCols, ["created_at", "updated_at", "id"]);
+    const orderWhere = [];
+    const orderParams = [];
+
+    if (appointmentRefCol) {
+      orderWhere.push(`lo.\`${appointmentRefCol}\` = ?`);
+      orderParams.push(req.params.appointmentId);
+    } else if (appointment && orderPatientCol) {
+      orderWhere.push(`lo.\`${orderPatientCol}\` = ?`);
+      orderParams.push(appointment.patient_id);
+      if (orderDoctorCol && appointment.doctor_id) {
+        orderWhere.push(`lo.\`${orderDoctorCol}\` = ?`);
+        orderParams.push(appointment.doctor_id);
+      }
+    }
+
     let rows = await query(
-      `SELECT lo.id, lo.test_name, lo.notes, lo.status, lo.appointment_id, lr.report_url AS result
+      `SELECT lo.\`${orderIdCol || "id"}\` AS id,
+              ${testNameCol ? `lo.\`${testNameCol}\`` : "NULL"} AS test_name,
+              ${notesCol ? `lo.\`${notesCol}\`` : "NULL"} AS notes,
+              ${statusCol ? `lo.\`${statusCol}\`` : "'pending'"} AS status,
+              ${appointmentRefCol ? `lo.\`${appointmentRefCol}\`` : "NULL"} AS appointment_id,
+              ${reportUrlCol && reportOrderRefCol ? `lr.\`${reportUrlCol}\`` : "NULL"} AS result
        FROM lab_orders lo
-       LEFT JOIN lab_reports lr ON lr.lab_order_id = lo.id
-       WHERE lo.appointment_id = ?
-       ORDER BY lo.created_at DESC`,
-      [req.params.appointmentId]
+       ${reportUrlCol && reportOrderRefCol ? `LEFT JOIN lab_reports lr ON lr.\`${reportOrderRefCol}\` = lo.\`${orderIdCol || "id"}\`` : ""}
+       ${orderWhere.length ? `WHERE ${orderWhere.join(" AND ")}` : ""}
+       ORDER BY lo.\`${sortCol || "id"}\` DESC`,
+      orderParams
     );
     if (!rows.length) {
+      const reportWhere = [];
+      const reportParams = [];
+
+      if (reportAppointmentRefCol) {
+        reportWhere.push(`\`${reportAppointmentRefCol}\` = ?`);
+        reportParams.push(req.params.appointmentId);
+      } else if (appointment && reportPatientCol) {
+        reportWhere.push(`\`${reportPatientCol}\` = ?`);
+        reportParams.push(appointment.patient_id);
+        if (reportDoctorCol && appointment.doctor_id) {
+          reportWhere.push(`\`${reportDoctorCol}\` = ?`);
+          reportParams.push(appointment.doctor_id);
+        }
+      }
+
       rows = await query(
-        `SELECT id, test_name, notes, status, appointment_id, report_url AS result
+        `SELECT \`${firstExistingColumn(labReportCols, ["id"]) || "id"}\` AS id,
+                ${firstExistingColumn(labReportCols, ["test_name", "testName", "title"]) ? `\`${firstExistingColumn(labReportCols, ["test_name", "testName", "title"])}\`` : "NULL"} AS test_name,
+                ${firstExistingColumn(labReportCols, ["notes", "comment", "comments", "description", "findings", "result_summary"]) ? `\`${firstExistingColumn(labReportCols, ["notes", "comment", "comments", "description", "findings", "result_summary"])}\`` : "NULL"} AS notes,
+                ${firstExistingColumn(labReportCols, ["status"]) ? `\`${firstExistingColumn(labReportCols, ["status"])}\`` : "'completed'"} AS status,
+                ${reportAppointmentRefCol ? `\`${reportAppointmentRefCol}\`` : "NULL"} AS appointment_id,
+                ${reportUrlCol ? `\`${reportUrlCol}\`` : "NULL"} AS result
          FROM lab_reports
-         WHERE appointment_id = ?
-         ORDER BY created_at DESC`,
-        [req.params.appointmentId]
+         ${reportWhere.length ? `WHERE ${reportWhere.join(" AND ")}` : ""}
+         ORDER BY \`${reportSortCol || "id"}\` DESC`,
+        reportParams
       );
     }
     const data = rows.map((row) => ({
@@ -1153,14 +1379,57 @@ router.get("/lab/appointment/:appointmentId", authMiddleware, async (req, res, n
 
 router.get("/lab", authMiddleware, async (req, res, next) => {
   try {
+    const labOrderCols = await getTableColumns("lab_orders");
+    const patientCols = await getTableColumns("patients");
+    const doctorCols = await getTableColumns("doctors");
+    const appointmentCols = await getTableColumns("appointments");
+
+    const patientNameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
+    const doctorNameCol = firstExistingColumn(doctorCols, ["full_name", "name"]);
+    const labOrderHospitalCol = firstExistingColumn(labOrderCols, ["hospital_id", "hospitalId"]);
+    const appointmentHospitalCol = firstExistingColumn(appointmentCols, ["hospital_id", "hospitalId"]);
+    const patientHospitalCol = firstExistingColumn(patientCols, ["hospital_id", "hospitalId"]);
+    const doctorHospitalCol = firstExistingColumn(doctorCols, ["hospital_id", "hospitalId"]);
+    const labOrderSortCol = firstExistingColumn(labOrderCols, ["created_at", "updated_at", "id"]);
+    const appointmentSortCol = firstExistingColumn(appointmentCols, ["created_at", "appointment_date", "id"]);
+
+    const patientNameSelect = patientNameCol ? `p.\`${patientNameCol}\` AS patient_name` : "NULL AS patient_name";
+    const doctorNameSelect = doctorNameCol ? `d.\`${doctorNameCol}\` AS doctor_name` : "NULL AS doctor_name";
+    const hospitalFilterColumn = labOrderHospitalCol
+      ? `lo.\`${labOrderHospitalCol}\``
+      : appointmentHospitalCol || doctorHospitalCol || patientHospitalCol
+        ? `COALESCE(${[
+            appointmentHospitalCol ? `a.\`${appointmentHospitalCol}\`` : null,
+            doctorHospitalCol ? `d.\`${doctorHospitalCol}\`` : null,
+            patientHospitalCol ? `p.\`${patientHospitalCol}\`` : null,
+          ].filter(Boolean).join(", ")})`
+        : null;
+    const orderByClause = labOrderSortCol
+      ? `lo.\`${labOrderSortCol}\` DESC`
+      : appointmentSortCol
+        ? `a.\`${appointmentSortCol}\` DESC`
+        : "lo.id DESC";
+
+    const joins = [
+      "LEFT JOIN patients p ON p.id = lo.patient_id",
+      "LEFT JOIN doctors d ON d.id = lo.doctor_id",
+    ];
+
+    if (appointmentHospitalCol) {
+      joins.push("LEFT JOIN appointments a ON a.id = lo.appointment_id");
+    }
+
+    const sql = `
+      SELECT lo.*, ${patientNameSelect}, ${doctorNameSelect}
+      FROM lab_orders lo
+      ${joins.join("\n      ")}
+      ${hospitalFilterColumn && req.user?.hospital_id != null ? `WHERE ${hospitalFilterColumn} = ?` : ""}
+      ORDER BY ${orderByClause}
+    `;
+
     const rows = await query(
-      `SELECT lo.*, p.full_name AS patient_name, d.full_name AS doctor_name
-       FROM lab_orders lo
-       LEFT JOIN patients p ON p.id = lo.patient_id
-       LEFT JOIN doctors d ON d.id = lo.doctor_id
-       WHERE lo.hospital_id = ?
-       ORDER BY lo.created_at DESC`,
-      [req.user.hospital_id]
+      sql,
+      hospitalFilterColumn && req.user?.hospital_id != null ? [req.user.hospital_id] : []
     );
     const data = rows.map((row) => ({
       ...row,
@@ -1178,15 +1447,70 @@ router.post("/lab/update-result/:id", authMiddleware, labUpload.array("reports")
   try {
     const files = Array.isArray(req.files) ? req.files : [];
     const uploaded = files.map((file) => `/uploads/lab/${path.basename(file.path)}`);
-    await query(
-      `UPDATE lab_orders SET status = 'completed', result = ?, comments = COALESCE(?, comments) WHERE id = ?`,
-      [JSON.stringify(uploaded), req.body.comment || null, req.params.id]
-    );
-    await query(
-      `INSERT INTO lab_reports (lab_order_id, report_url, status, comments)
-       VALUES (?, ?, 'completed', ?)`,
-      [req.params.id, uploaded[0] || null, req.body.comment || null]
-    );
+
+    const labOrderCols = await getTableColumns("lab_orders");
+    const labReportCols = await getTableColumns("lab_reports");
+    const orderRows = await query(`SELECT * FROM lab_orders WHERE id = ? LIMIT 1`, [req.params.id]);
+    const order = orderRows[0] || null;
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Lab order not found" });
+    }
+
+    const orderStatusCol = firstExistingColumn(labOrderCols, ["status"]);
+    const orderNotesCol = firstExistingColumn(labOrderCols, ["notes", "comment", "comments", "description"]);
+    const orderUpdates = [];
+    const orderParams = [];
+
+    if (orderStatusCol) {
+      orderUpdates.push(`\`${orderStatusCol}\` = ?`);
+      orderParams.push("completed");
+    }
+
+    if (orderNotesCol && req.body.comment) {
+      orderUpdates.push(`\`${orderNotesCol}\` = COALESCE(?, \`${orderNotesCol}\`)`);
+      orderParams.push(req.body.comment);
+    }
+
+    if (orderUpdates.length) {
+      orderParams.push(req.params.id);
+      await query(`UPDATE lab_orders SET ${orderUpdates.join(", ")} WHERE id = ?`, orderParams);
+    }
+
+    const reportValues = {};
+    const reportOrderRefCol = firstExistingColumn(labReportCols, ["lab_order_id", "labOrderId", "test_id"]);
+    const reportUrlCol = firstExistingColumn(labReportCols, ["report_url", "file_url"]);
+    const reportResultCol = firstExistingColumn(labReportCols, ["result"]);
+    const reportStatusCol = firstExistingColumn(labReportCols, ["status"]);
+    const reportNotesCol = firstExistingColumn(labReportCols, ["notes", "comment", "comments", "description", "findings", "result_summary"]);
+    const reportPatientCol = firstExistingColumn(labReportCols, ["patient_id", "patientId"]);
+    const reportDoctorCol = firstExistingColumn(labReportCols, ["doctor_id", "doctorId"]);
+    const reportHospitalCol = firstExistingColumn(labReportCols, ["hospital_id", "hospitalId"]);
+    const reportAppointmentCol = firstExistingColumn(labReportCols, ["appointment_id", "appointmentId"]);
+    const reportTestNameCol = firstExistingColumn(labReportCols, ["test_name", "testName", "title"]);
+    const reportDateCol = firstExistingColumn(labReportCols, ["report_date"]);
+
+    if (reportOrderRefCol) reportValues[reportOrderRefCol] = req.params.id;
+    if (reportUrlCol) reportValues[reportUrlCol] = uploaded[0] || null;
+    if (reportResultCol) reportValues[reportResultCol] = JSON.stringify(uploaded);
+    if (reportStatusCol) reportValues[reportStatusCol] = "completed";
+    if (reportNotesCol) reportValues[reportNotesCol] = req.body.comment || null;
+    if (reportPatientCol) reportValues[reportPatientCol] = order.patient_id ?? null;
+    if (reportDoctorCol) reportValues[reportDoctorCol] = order.doctor_id ?? null;
+    if (reportHospitalCol) reportValues[reportHospitalCol] = order.hospital_id ?? req.user?.hospital_id ?? null;
+    if (reportAppointmentCol) reportValues[reportAppointmentCol] = order.appointment_id ?? null;
+    if (reportTestNameCol) reportValues[reportTestNameCol] = order.test_name || "Lab Report";
+    if (reportDateCol) reportValues[reportDateCol] = new Date().toISOString().slice(0, 10);
+
+    const reportColumns = Object.keys(reportValues);
+    if (reportColumns.length) {
+      await query(
+        `INSERT INTO lab_reports (${reportColumns.map((col) => `\`${col}\``).join(", ")})
+         VALUES (${reportColumns.map(() => "?").join(", ")})`,
+        reportColumns.map((col) => reportValues[col])
+      );
+    }
+
     res.status(201).json({ success: true, message: "Report updated" });
   } catch (error) {
     next(error);
@@ -1249,25 +1573,305 @@ router.post("/reports/generate", authMiddleware, async (req, res, next) => {
 
 router.post("/billing/create", authMiddleware, async (req, res, next) => {
   try {
-    await query(
-      `INSERT INTO invoices (hospital_id, patient_id, admission_date, discharge_date, bed_type, bed_number, bed_price, billing_mode, payment_status, payment_method, transaction_id, total_amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.user.hospital_id,
-        req.body.patient_id,
-        req.body.admission_date || null,
-        req.body.discharge_date || null,
-        req.body.bed_type || null,
-        req.body.bed_number || null,
-        req.body.bed_price || null,
-        req.body.billing_mode || "full",
-        req.body.payment_status || "pending",
-        req.body.payment_method || null,
-        req.body.transaction_id || null,
-        req.body.grand_total || null,
-      ]
-    );
-    res.status(201).json({ success: true, message: "Billing saved" });
+    const invoiceCols = await getTableColumns("invoices");
+    if (!invoiceCols) {
+      return res.status(500).json({ success: false, message: "Invoices table not found" });
+    }
+
+    const invoiceItemCols = await getTableColumns("invoice_items");
+    const paymentCols = await getTableColumns("payments");
+
+    const resolveStatus = (value) => {
+      const normalized = String(value || "").toLowerCase().trim();
+      return normalized === "paid" ? "paid" : "unpaid";
+    };
+
+    const resolveSettlementFromRequest = ({ paymentStatus, paymentScope, totalAmount, surgeryTotal, bedTotal, customPaidAmount }) => {
+      const normalizedStatus = String(paymentStatus || "").toLowerCase().trim();
+      const normalizedScope = String(paymentScope || "").toLowerCase().trim();
+      const total = safeNumber(totalAmount);
+      const surgery = safeNumber(surgeryTotal);
+      const bed = safeNumber(bedTotal);
+      const custom = safeNumber(customPaidAmount);
+
+      if (normalizedStatus === "paid") {
+        return {
+          payment_status: "paid",
+          settlement_scope: normalizedScope || "full_bill",
+          paid_amount: total,
+          due_amount: 0,
+        };
+      }
+
+      if (normalizedScope === "surgery_only" && surgery > 0) {
+        return {
+          payment_status: "surgery_paid",
+          settlement_scope: "surgery_only",
+          paid_amount: Math.min(surgery, total),
+          due_amount: Math.max(total - surgery, 0),
+        };
+      }
+
+      if (normalizedScope === "bed_only" && bed > 0) {
+        return {
+          payment_status: "bed_paid",
+          settlement_scope: "bed_only",
+          paid_amount: Math.min(bed, total),
+          due_amount: Math.max(total - bed, 0),
+        };
+      }
+
+      if (normalizedScope === "custom" && custom > 0) {
+        return {
+          payment_status: custom >= total ? "paid" : "partially_paid",
+          settlement_scope: "custom",
+          paid_amount: Math.min(custom, total),
+          due_amount: Math.max(total - custom, 0),
+        };
+      }
+
+      return {
+        payment_status: normalizedStatus || "unpaid",
+        settlement_scope: normalizedScope || "none",
+        paid_amount: 0,
+        due_amount: total,
+      };
+    };
+
+    const resolvePaymentStatus = (value) => {
+      const normalized = String(value || "").toLowerCase().trim();
+      if (normalized === "paid") return "completed";
+      if (normalized === "failed") return "failed";
+      return "pending";
+    };
+
+    const safeNumber = (value) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    };
+
+    const normalizedSurgeries = Array.isArray(req.body.surgeries)
+      ? req.body.surgeries
+          .map((item) => ({
+            surgery_name: String(item?.surgery_name || "").trim(),
+            surgery_cost: safeNumber(item?.surgery_cost),
+            surgery_date: item?.surgery_date || null,
+            billing_type: String(item?.billing_type || "surgery").trim(),
+            notes: String(item?.notes || "").trim(),
+          }))
+          .filter((item) => item.surgery_name || item.surgery_cost > 0)
+      : [];
+
+    const bedPrice = safeNumber(req.body.bed_price);
+    const bedTotal = req.body.billing_mode === "full"
+      ? safeNumber(req.body.bed_total) || (
+          req.body.admission_date && req.body.discharge_date
+            ? Math.max(
+                1,
+                Math.round(
+                  (new Date(req.body.discharge_date) - new Date(req.body.admission_date)) /
+                    (1000 * 60 * 60 * 24)
+                )
+              ) * bedPrice
+            : 0
+        )
+      : 0;
+    const surgeryTotal = normalizedSurgeries.reduce((sum, item) => sum + safeNumber(item.surgery_cost), 0);
+    const subtotal = safeNumber(req.body.subtotal) || bedTotal + surgeryTotal;
+    const totalAmount = safeNumber(req.body.grand_total ?? req.body.total_amount) || subtotal;
+    const settlement = resolveSettlementFromRequest({
+      paymentStatus: req.body.payment_status,
+      paymentScope: req.body.payment_scope,
+      totalAmount,
+      surgeryTotal,
+      bedTotal,
+      customPaidAmount: req.body.paid_amount,
+    });
+
+    const values = {};
+
+    if (invoiceCols.has("hospital_id")) {
+      values.hospital_id = await resolveValidHospitalId(req.user.hospital_id || req.body.hospital_id || null);
+    }
+    if (invoiceCols.has("patient_id")) {
+      values.patient_id = req.body.patient_id || null;
+    }
+    if (invoiceCols.has("invoice_number")) {
+      values.invoice_number = req.body.invoice_number || `INV-${Date.now()}`;
+    }
+    if (invoiceCols.has("appointment_id")) {
+      values.appointment_id = req.body.appointment_id || null;
+    }
+    if (invoiceCols.has("subtotal")) {
+      values.subtotal = subtotal;
+    }
+    if (invoiceCols.has("tax_amount")) {
+      values.tax_amount = safeNumber(req.body.tax_amount);
+    }
+    if (invoiceCols.has("discount_amount")) {
+      values.discount_amount = safeNumber(req.body.discount_amount);
+    }
+    if (invoiceCols.has("total_amount")) {
+      values.total_amount = totalAmount;
+    }
+    if (invoiceCols.has("bed_total")) {
+      values.bed_total = bedTotal;
+    }
+    if (invoiceCols.has("surgery_total")) {
+      values.surgery_total = surgeryTotal;
+    }
+    if (invoiceCols.has("paid_amount")) {
+      values.paid_amount = settlement.paid_amount;
+    }
+    if (invoiceCols.has("due_amount")) {
+      values.due_amount = settlement.due_amount;
+    }
+    if (invoiceCols.has("status")) {
+      values.status = settlement.due_amount <= 0 ? "paid" : "unpaid";
+    }
+    if (invoiceCols.has("payment_status")) {
+      values.payment_status = settlement.payment_status;
+    }
+    if (invoiceCols.has("settlement_scope")) {
+      values.settlement_scope = settlement.settlement_scope;
+    }
+    if (invoiceCols.has("payment_note")) {
+      values.payment_note = req.body.payment_note || null;
+    }
+    if (invoiceCols.has("payment_method")) {
+      values.payment_method = req.body.payment_method || null;
+    }
+    if (invoiceCols.has("transaction_id")) {
+      values.transaction_id = req.body.transaction_id || null;
+    }
+    if (invoiceCols.has("billing_mode")) {
+      values.billing_mode = req.body.billing_mode || "full";
+    }
+    if (invoiceCols.has("admission_date")) {
+      values.admission_date = req.body.admission_date || null;
+    }
+    if (invoiceCols.has("discharge_date")) {
+      values.discharge_date = req.body.discharge_date || null;
+    }
+    if (invoiceCols.has("bed_type")) {
+      values.bed_type = req.body.bed_type || null;
+    }
+    if (invoiceCols.has("bed_number")) {
+      values.bed_number = req.body.bed_number || null;
+    }
+    if (invoiceCols.has("bed_price")) {
+      values.bed_price = bedPrice || null;
+    }
+    if (invoiceCols.has("due_date")) {
+      values.due_date = req.body.due_date || req.body.discharge_date || null;
+    }
+
+    const insertCols = Object.keys(values).filter((key) => values[key] !== undefined);
+    if (!insertCols.length) {
+      return res.status(400).json({ success: false, message: "No compatible invoice fields found" });
+    }
+
+    const connection = await getConnection();
+    let invoiceId = null;
+    try {
+      await connection.beginTransaction();
+
+      const [invoiceResult] = await connection.execute(
+        `INSERT INTO invoices (${insertCols.map((col) => `\`${col}\``).join(", ")})
+         VALUES (${insertCols.map(() => "?").join(", ")})`,
+        insertCols.map((col) => values[col] ?? null)
+      );
+
+      invoiceId = invoiceResult?.insertId || null;
+
+      if (invoiceId && invoiceItemCols) {
+        const itemRows = [];
+
+        if (bedTotal > 0) {
+          itemRows.push({
+            item_name: req.body.bed_type
+              ? `Bed Charges (${req.body.bed_type})`
+              : "Bed Charges",
+            price: bedTotal,
+            quantity: 1,
+            notes: [req.body.bed_number ? `Bed ${req.body.bed_number}` : "", req.body.admission_date && req.body.discharge_date ? `${req.body.admission_date} to ${req.body.discharge_date}` : ""]
+              .filter(Boolean)
+              .join(" | "),
+            service_date: req.body.admission_date || null,
+            billing_type: "bed",
+          });
+        }
+
+        normalizedSurgeries.forEach((item) => {
+          itemRows.push({
+            item_name: item.surgery_name || "Surgery Charge",
+            price: safeNumber(item.surgery_cost),
+            quantity: 1,
+            notes: item.notes || null,
+            service_date: item.surgery_date || null,
+            billing_type: item.billing_type || "surgery",
+          });
+        });
+
+        for (const row of itemRows) {
+          const itemValues = {};
+          if (invoiceItemCols.has("invoice_id")) itemValues.invoice_id = invoiceId;
+          if (invoiceItemCols.has("item_name")) itemValues.item_name = row.item_name;
+          if (invoiceItemCols.has("price")) itemValues.price = row.price;
+          if (invoiceItemCols.has("quantity")) itemValues.quantity = row.quantity;
+          if (invoiceItemCols.has("notes")) itemValues.notes = row.notes;
+          if (invoiceItemCols.has("service_date")) itemValues.service_date = row.service_date;
+          if (invoiceItemCols.has("billing_type")) itemValues.billing_type = row.billing_type;
+
+          const itemCols = Object.keys(itemValues).filter((key) => itemValues[key] !== undefined);
+          if (!itemCols.length) continue;
+
+          await connection.execute(
+            `INSERT INTO invoice_items (${itemCols.map((col) => `\`${col}\``).join(", ")})
+             VALUES (${itemCols.map(() => "?").join(", ")})`,
+            itemCols.map((col) => itemValues[col] ?? null)
+          );
+        }
+      }
+
+      if (invoiceId && paymentCols) {
+        const paymentValues = {};
+        if (paymentCols.has("invoice_id")) paymentValues.invoice_id = invoiceId;
+        if (paymentCols.has("hospital_id")) paymentValues.hospital_id = values.hospital_id ?? null;
+        if (paymentCols.has("patient_id")) paymentValues.patient_id = req.body.patient_id || null;
+        if (paymentCols.has("amount")) paymentValues.amount = totalAmount;
+        if (paymentCols.has("method")) paymentValues.method = req.body.payment_method || null;
+        if (paymentCols.has("reference_no")) paymentValues.reference_no = req.body.transaction_id || null;
+        if (paymentCols.has("status")) paymentValues.status = settlement.due_amount <= 0 ? "completed" : settlement.paid_amount > 0 ? "partial" : resolvePaymentStatus(req.body.payment_status);
+        if (paymentCols.has("payment_date")) paymentValues.payment_date = new Date();
+
+        const paymentInsertCols = Object.keys(paymentValues).filter((key) => paymentValues[key] !== undefined);
+        if (paymentInsertCols.length) {
+          await connection.execute(
+            `INSERT INTO payments (${paymentInsertCols.map((col) => `\`${col}\``).join(", ")})
+             VALUES (${paymentInsertCols.map(() => "?").join(", ")})`,
+            paymentInsertCols.map((col) => paymentValues[col] ?? null)
+          );
+        }
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Billing saved",
+      invoice: {
+        id: invoiceId,
+        invoice_number: values.invoice_number || null,
+        total_amount: totalAmount,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -1275,26 +1879,52 @@ router.post("/billing/create", authMiddleware, async (req, res, next) => {
 
 router.get("/register/dashboard", authMiddleware, async (req, res, next) => {
   try {
+    const { getTableColumns, firstExistingColumn } = require("../services/dbMeta");
     const date = req.query.date || null;
+    const hospitalId = req.user.hospital_id || req.user.hospitalId || null;
+    const selectedDate = date || new Date().toISOString().split("T")[0];
+    const patientCols = await getTableColumns("patients");
+    const doctorCols = await getTableColumns("doctors");
+    const patientNameCol = firstExistingColumn(patientCols, ["full_name", "name", "first_name"]);
+    const patientDisplayIdCol = firstExistingColumn(patientCols, ["patient_id", "patient_id_no"]);
+    const doctorNameCol = firstExistingColumn(doctorCols, ["full_name", "name", "first_name"]);
+    const patientNameSelect = patientNameCol ? `p.\`${patientNameCol}\` AS patient_name` : "NULL AS patient_name";
+    const patientDisplayIdSelect = patientDisplayIdCol ? `p.\`${patientDisplayIdCol}\` AS display_patient_id` : "NULL AS display_patient_id";
+    const doctorNameSelect = doctorNameCol ? `d.\`${doctorNameCol}\` AS doctor_name` : "NULL AS doctor_name";
+
     const [patientsCount, todayAppointments] = await Promise.all([
-      query(`SELECT COUNT(*) AS total FROM patients WHERE hospital_id = ?`, [req.user.hospital_id]),
-      date
-        ? query(`SELECT COUNT(*) AS total FROM appointments WHERE hospital_id = ? AND appointment_date = ?`, [req.user.hospital_id, date])
-        : query(`SELECT COUNT(*) AS total FROM appointments WHERE hospital_id = ? AND appointment_date = CURDATE()`, [req.user.hospital_id]),
+      hospitalId
+        ? query(`SELECT COUNT(*) AS total FROM patients WHERE hospital_id = ?`, [hospitalId])
+        : query(`SELECT COUNT(*) AS total FROM patients`),
+      hospitalId
+        ? query(
+            `SELECT COUNT(*) AS total
+               FROM appointments a
+               LEFT JOIN patients p ON p.id = a.patient_id
+              WHERE COALESCE(a.hospital_id, p.hospital_id) = ?
+                AND a.appointment_date = ?`,
+            [hospitalId, selectedDate]
+          )
+        : query(`SELECT COUNT(*) AS total FROM appointments WHERE appointment_date = ?`, [selectedDate]),
     ]);
 
     const rows = await query(
-      `SELECT a.*, p.full_name AS patient_name, d.full_name AS doctor_name
+      `SELECT a.*,
+              ${patientNameSelect},
+              ${patientDisplayIdSelect},
+              ${doctorNameSelect}
        FROM appointments a
        LEFT JOIN patients p ON p.id = a.patient_id
        LEFT JOIN doctors d ON d.id = a.doctor_id
-       WHERE a.hospital_id = ? AND a.appointment_date = ?
+       WHERE ${hospitalId ? "COALESCE(a.hospital_id, p.hospital_id) = ? AND" : ""} a.appointment_date = ?
        ORDER BY a.appointment_time ASC`,
-      [req.user.hospital_id, date || new Date().toISOString().split("T")[0]]
+      hospitalId ? [hospitalId, selectedDate] : [selectedDate]
     );
 
     const list = rows.map((row) => ({
       ...row,
+      patient_id: row.display_patient_id || row.patient_id,
+      appointment_patient_id: row.patient_id,
       patientName: row.patient_name,
       doctorName: row.doctor_name,
       time: row.appointment_time,
@@ -1306,8 +1936,8 @@ router.get("/register/dashboard", authMiddleware, async (req, res, next) => {
       success: true,
       totalPatients: patientsCount[0]?.total || 0,
       appointmentsToday: todayAppointments[0]?.total || 0,
-      paid: 0,
-      unpaid: 0,
+      paid: list.filter((item) => String(item.paymentStatus || "").toLowerCase() === "paid").length,
+      unpaid: list.filter((item) => ["pending", "unpaid"].includes(String(item.paymentStatus || "").toLowerCase())).length,
       list,
     });
   } catch (error) {

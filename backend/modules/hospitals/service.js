@@ -80,7 +80,7 @@ async function create(payload) {
   const mode = await getSchemaMode();
 
   if (mode === "legacy") {
-    const connection = await getConnection();
+      const connection = await getConnection();
     try {
       await connection.beginTransaction();
 

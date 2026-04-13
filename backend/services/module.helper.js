@@ -10,6 +10,7 @@ function getScopedHospitalId(req, fallback = null) {
   const body = req.body || {};
   return (
     req.hospitalId ||
+    req.user?.hospital_id ||
     req.query.hospital_id ||
     body.hospital_id ||
     body.hospitalId ||

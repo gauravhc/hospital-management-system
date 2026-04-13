@@ -58,6 +58,11 @@ export default function PatientCreatePage() {
         setForm((prev) => ({ ...prev, dob: value, age }));
     };
 
+    const handleAgeChange = (value) => {
+        const sanitized = String(value || "").replace(/[^\d]/g, "").slice(0, 3);
+        setForm((prev) => ({ ...prev, age: sanitized }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const requiredFields = ["fullName", "email", "gender", "bloodGroup", "dob", "primaryPhone"];
@@ -70,22 +75,30 @@ export default function PatientCreatePage() {
         }
 
         try {
+            const safe = (value) => {
+                if (value === undefined || value === null) return "";
+                return String(value).trim();
+            };
+
+            const addressParts = [
+                safe(form.address1),
+                safe(form.address2),
+                safe(form.state),
+                safe(form.country),
+            ].filter(Boolean);
+
             const payload = {
-                name: form.fullName,
-                email: form.email,
-                gender: form.gender,
-                blood_group: form.bloodGroup,
-                marital_status: form.maritalStatus,
-                dob: form.dob,
-                age: form.age,
-                mobile: form.primaryPhone,
-                alternate_mobile: form.altPhone,
-                country_code: form.primaryCode,
-                alt_country_code: form.altCode,
-                address: `${form.address1} ${form.address2 || ""}, ${form.state}, ${form.country} - ${form.pincode}`,
-                emergency_contact: form.primaryPhone,
-                guardian_name: form.fullName,
-                medical_history: "Not provided",
+                name: safe(form.fullName),
+                email: safe(form.email).toLowerCase(),
+                gender: safe(form.gender),
+                blood_group: safe(form.bloodGroup),
+                dob: safe(form.dob),
+                age: safe(form.age),
+                mobile: safe(form.primaryPhone),
+                state: safe(form.state),
+                country: safe(form.country),
+                pincode: safe(form.pincode),
+                address: [addressParts.join(", "), safe(form.pincode)].filter(Boolean).join(" - "),
             };
 
             const data = await apiPost("/api/register/create", payload);
@@ -100,7 +113,7 @@ export default function PatientCreatePage() {
             router.push(`/register/registration?patient_id=${createdPatient.patient_id}`);
         } catch (err) {
             console.error(err);
-            alert("Server error");
+            alert(err?.message || "Server error");
         }
     };
 
@@ -129,7 +142,7 @@ export default function PatientCreatePage() {
                             </select>
                             <div className="grid grid-cols-2 gap-2">
                                 <input type="date" value={form.dob} onChange={e => handleDobChange(e.target.value)} className="border p-2 rounded w-full" />
-                                <input type="text" value={form.age} readOnly placeholder="Age" className="border p-2 rounded w-full bg-slate-50" />
+                                <input type="number" min="0" max="150" value={form.age} onChange={e => handleAgeChange(e.target.value)} placeholder="Age" className="border p-2 rounded w-full" />
                             </div>
                         </div>
                     </section>

@@ -1,11 +1,22 @@
+function normalizeRoleAlias(value) {
+  const role = String(value || "").toLowerCase().trim();
+  if (role === "reception" || role === "receptionist") return "register";
+  if (role === "labtechnician" || role === "lab_technician" || role === "lab technician") return "lab";
+  if (role === "inventorymanager" || role === "inventory_manager") return "inventory";
+  if (role === "hrmanager" || role === "hr_manager" || role === "hr manager") return "hr";
+  if (role === "superadmin" || role === "super-admin") return "super_admin";
+  if (role === "administrator") return "hospital_admin";
+  return role;
+}
+
 function roleMiddleware(...roles) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: "Authentication required" });
     }
 
-    const actorRole = String(req.user.role || "").toLowerCase().trim();
-    const allowed = roles.map((r) => String(r || "").toLowerCase().trim());
+    const actorRole = normalizeRoleAlias(req.user.role);
+    const allowed = roles.map((r) => normalizeRoleAlias(r));
 
     if (!allowed.includes(actorRole)) {
       return res.status(403).json({ success: false, message: "Forbidden" });
@@ -20,7 +31,7 @@ function hospitalScope(req, res, next) {
     return res.status(401).json({ success: false, message: "Authentication required" });
   }
 
-  const actorRole = String(req.user.role || "").toLowerCase().trim();
+  const actorRole = normalizeRoleAlias(req.user.role);
 
   if (actorRole === "patient") {
     return next();

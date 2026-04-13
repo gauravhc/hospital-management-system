@@ -11,7 +11,22 @@ const ROLE_LOGIN_ORDER = [
   { role: "nurse", table: "nurses" },
   { role: "staff", table: "staff" },
   { role: "patient", table: "patients" },
+  { role: "reception", table: "receptionists" }, 
 ];
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeAppRole(value) {
+  const role = String(value || "").trim().toLowerCase();
+  if (role === "administrator") return "hospital_admin";
+  if (role === "superadmin" || role === "super-admin") return "super_admin";
+  if (role === "reception" || role === "receptionist" || role === "register") return "register";
+  if (role === "inventorymanager" || role === "inventory_manager") return "inventory";
+  if (role === "hrmanager" || role === "hr_manager" || role === "hr manager") return "hr";
+  return role;
+}
 
 function normalizeProfileImage(value) {
   if (!value) return "";
@@ -83,18 +98,159 @@ async function findRoleUserByEmail(email) {
     if (!rows.length) continue;
 
     if (entry.role === "staff") {
-      const staffRole = String(rows[0]?.staff_role || "").trim().toLowerCase();
+      const staffRole = normalizeAppRole(rows[0]?.staff_role || "staff");
       return { ...rows[0], role: staffRole || "staff" };
     }
 
-    return { ...rows[0], role: entry.role };
+    return { ...rows[0], role: normalizeAppRole(entry.role) };
   }
 
   return null;
 }
 
+async function findSharedUserByEmail(email) {
+  const userCols = await getTableColumns("users");
+  const roleCols = await getTableColumns("roles");
+  if (!userCols) return null;
+
+  const idCol = firstExistingColumn(userCols, ["id", "user_id"]);
+  const emailCol = firstExistingColumn(userCols, ["email", "username"]);
+  const passwordCol = firstExistingColumn(userCols, ["password_hash", "password"]);
+  const hospitalCol = firstExistingColumn(userCols, ["hospital_id"]);
+  const statusCol = firstExistingColumn(userCols, ["status"]);
+  const fullNameCol = firstExistingColumn(userCols, ["full_name", "name"]);
+  const firstNameCol = firstExistingColumn(userCols, ["first_name"]);
+  const lastNameCol = firstExistingColumn(userCols, ["last_name"]);
+  const imageCol = firstExistingColumn(userCols, ["profile_image_url", "profile_image", "avatar_url", "photo_url"]);
+  const directRoleCol = firstExistingColumn(userCols, ["role"]);
+  const roleIdCol = firstExistingColumn(userCols, ["role_id"]);
+  const roleNameCol = firstExistingColumn(roleCols, ["name"]);
+  const rolePkCol = firstExistingColumn(roleCols, ["id"]);
+
+  if (!idCol || !emailCol || !passwordCol) {
+    return null;
+  }
+
+  const nameSelect = fullNameCol
+    ? `u.\`${fullNameCol}\` AS name`
+    : firstNameCol && lastNameCol
+      ? `TRIM(CONCAT(COALESCE(u.\`${firstNameCol}\`, ''), ' ', COALESCE(u.\`${lastNameCol}\`, ''))) AS name`
+      : firstNameCol
+        ? `u.\`${firstNameCol}\` AS name`
+        : "NULL AS name";
+
+  const roleSelect = directRoleCol
+    ? `LOWER(u.\`${directRoleCol}\`) AS role`
+    : roleIdCol && roleNameCol && rolePkCol
+      ? `LOWER(r.\`${roleNameCol}\`) AS role`
+      : "NULL AS role";
+
+  const select = [
+    `u.\`${idCol}\` AS id`,
+    `u.\`${emailCol}\` AS email`,
+    `u.\`${passwordCol}\` AS password`,
+    hospitalCol ? `u.\`${hospitalCol}\` AS hospital_id` : "NULL AS hospital_id",
+    statusCol ? `u.\`${statusCol}\` AS status` : "NULL AS status",
+    imageCol ? `u.\`${imageCol}\` AS profile_image` : "NULL AS profile_image",
+    nameSelect,
+    roleSelect,
+  ];
+
+  const joinClause =
+    !directRoleCol && roleIdCol && roleNameCol && rolePkCol
+      ? ` LEFT JOIN \`roles\` r ON u.\`${roleIdCol}\` = r.\`${rolePkCol}\``
+      : "";
+
+  const rows = await query(
+    `SELECT ${select.join(", ")}
+     FROM \`users\` u
+     ${joinClause}
+     WHERE LOWER(u.\`${emailCol}\`) = ?
+     LIMIT 1`,
+    [String(email || "").trim().toLowerCase()]
+  );
+
+  if (!rows.length) return null;
+  return {
+    ...rows[0],
+    role: normalizeAppRole(rows[0]?.role),
+  };
+}
+
+async function bootstrapSuperAdminIfNeeded(email, password) {
+  const allowedEmail = normalizeEmail(process.env.SUPER_ADMIN_EMAIL);
+  const allowedPassword = String(process.env.SUPER_ADMIN_PASSWORD || "");
+  const safeEmail = normalizeEmail(email);
+  const safePassword = String(password || "");
+
+  if (!allowedEmail || !allowedPassword) return null;
+  if (safeEmail !== allowedEmail || safePassword !== allowedPassword) return null;
+
+  const existingRoleUser = await findRoleUserByEmail(safeEmail);
+  if (existingRoleUser) return existingRoleUser;
+
+  const existingSharedUser = await findSharedUserByEmail(safeEmail);
+  if (existingSharedUser) return existingSharedUser;
+
+  const superAdminCols = await getTableColumns("super_admins");
+  if (superAdminCols) {
+    const nameCol = firstExistingColumn(superAdminCols, ["full_name", "name"]);
+    const emailCol = firstExistingColumn(superAdminCols, ["email"]);
+    const passwordCol = firstExistingColumn(superAdminCols, ["password", "password_hash"]);
+
+    if (nameCol && emailCol && passwordCol) {
+      const values = {
+        [nameCol]: "Super Admin",
+        [emailCol]: allowedEmail,
+        [passwordCol]: await bcrypt.hash(allowedPassword, 10),
+      };
+
+      const insertCols = Object.keys(values);
+      await query(
+        `INSERT INTO \`super_admins\` (${insertCols.map((c) => `\`${c}\``).join(", ")})
+         VALUES (${insertCols.map(() => "?").join(", ")})`,
+        insertCols.map((c) => values[c])
+      );
+
+      return findRoleUserByEmail(safeEmail);
+    }
+  }
+
+  const userCols = await getTableColumns("users");
+  if (!userCols) return null;
+
+  const nameCol = firstExistingColumn(userCols, ["full_name", "name"]);
+  const emailCol = firstExistingColumn(userCols, ["email", "username"]);
+  const passwordCol = firstExistingColumn(userCols, ["password", "password_hash"]);
+  const roleCol = firstExistingColumn(userCols, ["role"]);
+
+  if (!nameCol || !emailCol || !passwordCol || !roleCol) return null;
+
+  const values = {
+    [nameCol]: "Super Admin",
+    [emailCol]: allowedEmail,
+    [passwordCol]: await bcrypt.hash(allowedPassword, 10),
+    [roleCol]: "super_admin",
+  };
+
+  if (userCols.has("status")) values.status = "active";
+
+  const insertCols = Object.keys(values);
+  await query(
+    `INSERT INTO \`users\` (${insertCols.map((c) => `\`${c}\``).join(", ")})
+     VALUES (${insertCols.map(() => "?").join(", ")})`,
+    insertCols.map((c) => values[c])
+  );
+
+  return findSharedUserByEmail(safeEmail);
+}
+
 async function login(email, password) {
-  const user = await findRoleUserByEmail(String(email || "").trim().toLowerCase());
+  const safeEmail = String(email || "").trim().toLowerCase();
+  const user =
+    await findRoleUserByEmail(safeEmail) ||
+    await findSharedUserByEmail(safeEmail) ||
+    await bootstrapSuperAdminIfNeeded(safeEmail, password);
   if (!user) return null;
 
   if (user.status && String(user.status).toLowerCase() !== "active") return null;

@@ -59,7 +59,7 @@ const buildProfileResponse = (patient) => {
 
   return {
   id: patient?.id,
-  patient_id: patient?.id,
+  patient_id: patient?.patient_id || patient?.patient_id_no || patient?.id,
   name: patient?.full_name || patient?.name || "",
   full_name: patient?.full_name || patient?.name || "",
   email: patient?.email || "",
@@ -109,7 +109,15 @@ const resolvePatientRow = async (req) => {
 
 async function list(req, res) {
   const rows = await service.list(getScopedHospitalId(req));
-  return res.json({ success: true, message: "Success", data: rows, patients: rows });
+  const patients = rows.map((row) => ({
+    ...row,
+    patient_id: row.patient_id || row.id,
+    name: row.name || row.full_name || "",
+    full_name: row.full_name || row.name || "",
+    mobile: row.mobile || row.phone || "",
+    phone: row.phone || row.mobile || "",
+  }));
+  return res.json({ success: true, message: "Success", data: patients, patients });
 }
 
 async function search(req, res) {
@@ -167,6 +175,8 @@ async function getById(req, res) {
   if (
     actorRole &&
     actorRole !== "super_admin" &&
+    req.user?.hospital_id !== null &&
+    req.user?.hospital_id !== undefined &&
     patientHospitalId !== null &&
     patientHospitalId !== undefined &&
     String(patientHospitalId) !== String(req.user?.hospital_id)
@@ -180,7 +190,7 @@ async function getById(req, res) {
     ...profile,
     name: row.name || row.full_name,
     phone: row.phone || row.mobile,
-    patient_id: row.patient_id || row.id,
+    patient_id: row.patient_id || row.patient_id_no || row.id,
   };
   return res.json({ success: true, message: "Success", data: patient, patient });
 }

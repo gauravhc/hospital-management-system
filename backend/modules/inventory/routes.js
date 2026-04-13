@@ -12,5 +12,7 @@ router.post("/items", asyncHandler(controller.createItem));
 router.put("/items/:id", asyncHandler(controller.updateItem));
 router.delete("/items/:id", asyncHandler(controller.removeItem));
 router.get("/low-stock", asyncHandler(controller.lowStock));
+router.get("/batches", asyncHandler(controller.batches));
+router.post("/batches", asyncHandler(controller.createBatch));
 
 module.exports = router;

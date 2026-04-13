@@ -22,14 +22,25 @@ export default function MedicineList({ results, onSelect }) {
                         <tr key={med.id} className="border-b hover:bg-gray-50">
                             <td className="p-2 font-medium">{med.name}</td>
                             <td className="p-2 text-gray-500">{med.generic_name || '-'}</td>
-                            <td className="p-2">{med.total_stock || 0}</td>
+                            <td className="p-2">
+                                <div className="flex flex-col gap-1">
+                                    <span>{med.total_stock || 0}</span>
+                                    {med.isExpired ? (
+                                        <span className="text-[11px] font-semibold text-rose-600">Expired</span>
+                                    ) : null}
+                                    {!med.isExpired && Number(med.total_stock || 0) <= 0 ? (
+                                        <span className="text-[11px] font-semibold text-amber-600">Out of stock</span>
+                                    ) : null}
+                                </div>
+                            </td>
                             <td className="p-2">{formatCurrency(med.selling_price)}</td>
                             <td className="p-2">
                                 <button
                                     onClick={() => onSelect(med)}
-                                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                                    disabled={med.isExpired || Number(med.total_stock || 0) <= 0}
+                                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
-                                    Select
+                                    {med.isExpired ? "Expired" : Number(med.total_stock || 0) <= 0 ? "No Stock" : "Select"}
                                 </button>
                             </td>
                         </tr>

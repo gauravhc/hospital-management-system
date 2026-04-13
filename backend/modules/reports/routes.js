@@ -7,6 +7,9 @@ const { asyncHandler } = require("../../services/module.helper");
 const router = express.Router();
 router.use(authMiddleware, hospitalScope);
 
+router.get("/", asyncHandler(controller.list));
+router.get("/patient/:patientId", asyncHandler(controller.patientReport));
+router.post("/generate", asyncHandler(controller.generate));
 router.get("/appointments", asyncHandler(controller.appointments));
 router.get("/revenue", asyncHandler(controller.revenue));
 router.get("/patient-visits", asyncHandler(controller.patientVisits));

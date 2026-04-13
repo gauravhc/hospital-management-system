@@ -37,8 +37,13 @@ router.post("/register", upload.single("profile_image"), asyncHandler(controller
 
 router.use(authMiddleware);
 
+<<<<<<< HEAD
 router.get("/", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.list));
 router.get("/search", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.search));
+=======
+router.get("/", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse", "pharmacist", "reception", "receptionist", "register", "admin"), asyncHandler(controller.list));
+router.get("/all", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse", "pharmacist", "reception", "receptionist", "register", "admin"), asyncHandler(controller.list));
+>>>>>>> 7fdfd7e (committing the changes)
 router.post("/", hospitalScope, roleMiddleware("super_admin", "hospital_admin"), asyncHandler(controller.create));
 router.put("/profile", roleMiddleware("patient"), upload.single("profile_image"), asyncHandler(controller.updateProfile));
 router.get("/profile", roleMiddleware("patient"), asyncHandler(controller.getProfile));
@@ -53,8 +58,12 @@ router.get("/lab-reports", roleMiddleware("patient"), asyncHandler(controller.li
 router.post("/lab-tests", roleMiddleware("patient"), asyncHandler(controller.orderLabTest));
 router.get("/lab-tests", roleMiddleware("patient"), asyncHandler(controller.listMyLabTests));
 
+<<<<<<< HEAD
 // NOTE: keep specific routes (like /search) above /:id to avoid conflicts.
 router.get("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.getById));
+=======
+router.get("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse", "pharmacist", "reception", "receptionist", "register", "admin"), asyncHandler(controller.getById));
+>>>>>>> 7fdfd7e (committing the changes)
 router.put("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor"), asyncHandler(controller.update));
 router.delete("/:id", hospitalScope, roleMiddleware("super_admin", "hospital_admin"), asyncHandler(controller.remove));
 router.get("/:id/appointments", hospitalScope, roleMiddleware("super_admin", "hospital_admin", "doctor", "nurse"), asyncHandler(controller.appointments));

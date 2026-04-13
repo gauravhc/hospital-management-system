@@ -44,6 +44,23 @@ export default function SuperAdminDashboard() {
     confirmPassword: "",
   });
 
+  const normalizeStatsPayload = (payload) => {
+    if (!payload || typeof payload !== "object") {
+      return { hospitals: 0, admins: 0, staff: 0, users: 0, appointments: 0, patients: 0 };
+    }
+    return payload.data && typeof payload.data === "object" ? payload.data : payload;
+  };
+
+  const extractArray = (payload, keys = []) => {
+    if (Array.isArray(payload)) return payload;
+    if (!payload || typeof payload !== "object") return [];
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+    if (Array.isArray(payload.data)) return payload.data;
+    return [];
+  };
+
   const fetchData = async () => {
     if (isFetchingRef.current) return;
     try {
@@ -54,6 +71,7 @@ export default function SuperAdminDashboard() {
         apiClient.get(`/api/super-admins?t=${Date.now()}`),
       ]);
 
+<<<<<<< HEAD
       setStats(statRes.data || { hospitals: 0, admins: 0, staff: 0 });
       setHospitals(Array.isArray(hospRes.data?.hospitals) ? hospRes.data.hospitals : []);
       const superAdminPayload = saRes.data;
@@ -65,6 +83,11 @@ export default function SuperAdminDashboard() {
             ? superAdminPayload.admins
             : [];
       setSuperAdmins(superAdminRows);
+=======
+      setStats(normalizeStatsPayload(statRes.data));
+      setHospitals(extractArray(hospRes.data, ["hospitals"]));
+      setSuperAdmins(extractArray(saRes.data, ["admins", "superAdmins", "super_admins"]));
+>>>>>>> 7fdfd7e (committing the changes)
       setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Error loading super admin dashboard:", err);
@@ -135,7 +158,7 @@ export default function SuperAdminDashboard() {
     }
     return {
       hospitals: keys.size,
-      admins: hospitals.length,
+      admins: Number(stats?.users || 0),
       superAdmins: displaySuperAdmins.length,
       staff: Number(stats?.staff || 0),
     };

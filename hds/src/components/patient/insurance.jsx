@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, ShieldCheck, UploadCloud } from "lucide-react";
 
@@ -159,6 +160,129 @@ export default function PatientInsurancePage() {
       setSaving(false);
     }
   };
+=======
+import React, { useEffect, useState } from "react";
+import { apiGet, apiPost } from "@/services/api";
+import useLiveCount from "./useLiveCount";
+import backendUrl from "@/lib/backendUrl";
+import { ExternalLink, Paperclip, PlusCircle } from "lucide-react";
+
+const PatientInsurancePage = () => {
+  const activeClaims = useLiveCount("/api/claims/active/count", 30000);
+  const [policies, setPolicies] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [claims, setClaims] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [form, setForm] = useState({
+    invoice_id: "",
+    policy_id: "",
+    amount: "",
+    notes: "",
+    attachment: null,
+  });
+
+  const load = async () => {
+    const [policyRes, invoiceRes, claimRes] = await Promise.all([
+      apiGet("/api/insurance/policies"),
+      apiGet("/api/patients/bills"),
+      apiGet("/api/claims"),
+    ]);
+    setPolicies(policyRes.data || []);
+    setInvoices(invoiceRes.data || invoiceRes.bills || []);
+    setClaims(claimRes.data || []);
+  };
+
+  useEffect(() => {
+    load().catch((error) => setFeedback({ type: "error", message: error.message }));
+  }, []);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "invoice_id") {
+        const selectedInvoice = invoices.find((invoice) => String(invoice?.id) === String(value || ""));
+        if (selectedInvoice) {
+          next.amount = String(selectedInvoice?.total_amount ?? selectedInvoice?.subtotal ?? prev.amount ?? "");
+        }
+      }
+      return next;
+    });
+  };
+
+  const submitClaim = async (event) => {
+    event.preventDefault();
+    try {
+      setBusy(true);
+      const payload = new FormData();
+      payload.append("invoice_id", form.invoice_id || "");
+      payload.append("policy_id", form.policy_id || "");
+      payload.append("amount", form.amount || "");
+      payload.append("notes", form.notes || "");
+      if (form.attachment) payload.append("attachment", form.attachment);
+      await apiPost("/api/claims", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setForm({ invoice_id: "", policy_id: "", amount: "", notes: "", attachment: null });
+      await load();
+      setFeedback({ type: "success", message: "Claim submitted successfully." });
+    } catch (error) {
+      setFeedback({ type: "error", message: error.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAttachmentChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setForm((prev) => ({ ...prev, attachment: file }));
+  };
+
+  const visibleClaims = claims.filter((claim) => {
+    const policyOk =
+      !claim?.policy_id || policies.some((policy) => String(policy?.id) === String(claim?.policy_id));
+    const invoiceOk =
+      !claim?.invoice_id || invoices.some((invoice) => String(invoice?.id) === String(claim?.invoice_id));
+    return policyOk && invoiceOk;
+  });
+
+  const formatAmount = (value) => {
+    if (value === null || value === undefined || value === "") return "--";
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }) : value;
+  };
+
+  const formatPolicyLabel = (policy) => {
+    if (!policy) return "--";
+    const provider = policy?.provider_name || "--";
+    const name = policy?.policy_name || policy?.policy_number || policy?.id;
+    return `${provider} - ${name}`;
+  };
+
+  const formatInvoiceLabel = (invoice) => {
+    if (!invoice) return "--";
+    const amount = invoice?.total_amount ?? invoice?.subtotal;
+    return amount !== null && amount !== undefined && amount !== ""
+      ? `Invoice ${invoice.id} - ${formatAmount(amount)}`
+      : `Invoice ${invoice.id}`;
+  };
+
+  const formatStatus = (value) => {
+    const status = String(value || "").toLowerCase();
+    const label = status ? status.replaceAll("_", " ").replace(/\b\w/g, (m) => m.toUpperCase()) : "--";
+    const className =
+      status === "approved"
+        ? "bg-emerald-50 text-emerald-700"
+        : status === "rejected"
+        ? "bg-rose-50 text-rose-700"
+        : "bg-amber-50 text-amber-700";
+    return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${className}`}>{label}</span>;
+  };
+
+  const getClaimDocumentUrl = (claim) =>
+    claim?.attachment_url || claim?.document_url || claim?.file_url || claim?.attachment_path || claim?.file_path || "";
+>>>>>>> 7fdfd7e (committing the changes)
 
   return (
     <div className="space-y-6 bg-slate-50 p-6 min-h-screen">
@@ -183,6 +307,7 @@ export default function PatientInsurancePage() {
         </div>
       ) : null}
 
+<<<<<<< HEAD
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -205,12 +330,99 @@ export default function PatientInsurancePage() {
                     Insurance card
                   </a>
                 </div>
+=======
+          {/* HEADER */}
+          <header className="mb-10 flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-extrabold text-slate-900">
+                Claim Insurance
+              </h2>
+              <p className="text-slate-600">
+                Submit your insurance claims and track the current review status.
+              </p>
+            </div>
+
+            <div className="text-right p-4 bg-white/90 rounded-xl shadow border">
+              <div className="text-sm text-slate-500">
+                Active Claims
+              </div>
+              <div className="text-2xl font-bold text-sky-700">
+                {Math.max(activeClaims, visibleClaims.length)}
+              </div>
+            </div>
+          </header>
+
+          {/* NEW CLAIM FORM */}
+          <section className="bg-white/90 rounded-2xl shadow-xl p-8 border border-white/30">
+            <h4 className="font-semibold mb-4 text-xl flex items-center gap-2">
+              <PlusCircle size={20} /> New Claim
+            </h4>
+
+            {feedback ? (
+              <div className={`mb-4 rounded-xl px-4 py-3 text-sm font-medium ${feedback.type === "error" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
+                {feedback.message}
               </div>
             ) : null}
 
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={submitClaim}>
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-slate-700">Invoice</span>
+                <select className="w-full rounded-xl border p-3" name="invoice_id" value={form.invoice_id} onChange={handleChange}>
+                  <option value="">Select an invoice</option>
+                  {invoices.map((invoice) => (
+                    <option key={invoice.id} value={invoice.id}>
+                      {formatInvoiceLabel(invoice)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-slate-700">Policy</span>
+                <select className="w-full rounded-xl border p-3" name="policy_id" value={form.policy_id} onChange={handleChange}>
+                  <option value="">Select a policy</option>
+                  {policies.map((policy) => (
+                    <option key={policy.id} value={policy.id}>
+                      {formatPolicyLabel(policy)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-slate-700">Claim Amount</span>
+                <input className="w-full rounded-xl border p-3" name="amount" value={form.amount} onChange={handleChange} type="number" min="0" step="0.01" placeholder="Enter claim amount" required />
+              </label>
+
+              <label className="block space-y-2 md:col-span-2">
+                <span className="text-sm font-semibold text-slate-700">Notes</span>
+                <textarea className="w-full rounded-xl border p-3" name="notes" value={form.notes} onChange={handleChange} placeholder="Add supporting claim notes" />
+              </label>
+
+              <div className="block space-y-2 md:col-span-2">
+                <span className="text-sm font-semibold text-slate-700">Claim Document</span>
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600 transition hover:border-sky-400 hover:bg-sky-50">
+                  <span className="inline-flex items-center gap-2">
+                    <Paperclip size={16} />
+                    {form.attachment ? form.attachment.name : "Upload PDF, JPG, PNG, or WEBP"}
+                  </span>
+                  <span className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">Choose File</span>
+                  <input type="file" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={handleAttachmentChange} />
+                </label>
+>>>>>>> 7fdfd7e (committing the changes)
+              </div>
+            ) : null}
+
+<<<<<<< HEAD
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-extrabold text-slate-900">
                 Step {step} of 2
+=======
+              <div className="md:col-span-2 flex justify-end">
+                <button disabled={busy || !form.policy_id || !form.amount} className="px-5 py-2 bg-sky-600 text-white rounded-xl shadow hover:bg-sky-700 transition disabled:cursor-not-allowed disabled:opacity-60">
+                  {busy ? "Submitting..." : "Submit Claim"}
+                </button>
+>>>>>>> 7fdfd7e (committing the changes)
               </div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
                 <span className={`rounded-full px-3 py-1 ${step === 1 ? "bg-yellow-100 text-yellow-800" : "bg-slate-100"}`}>Identity</span>
@@ -218,6 +430,7 @@ export default function PatientInsurancePage() {
               </div>
             </div>
 
+<<<<<<< HEAD
             {step === 1 ? (
               <div key="insurance-step-1" className="mt-5 grid gap-5 md:grid-cols-2">
                 <div>
@@ -362,6 +575,59 @@ export default function PatientInsurancePage() {
           </>
         )}
       </div>
+=======
+          <section className="mt-8 bg-white/90 rounded-2xl shadow-xl p-8 border border-white/30">
+            <h4 className="font-semibold mb-4 text-xl">My Claims</h4>
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-slate-500">
+                    <th className="px-3 py-3 font-semibold">Policy</th>
+                    <th className="px-3 py-3 font-semibold">Invoice</th>
+                    <th className="px-3 py-3 font-semibold">Amount</th>
+                    <th className="px-3 py-3 font-semibold">Status</th>
+                    <th className="px-3 py-3 font-semibold">Document</th>
+                    <th className="px-3 py-3 font-semibold">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleClaims.length ? (
+                    visibleClaims.map((claim) => {
+                      const policy = policies.find((item) => String(item.id) === String(claim.policy_id));
+                      const invoice = invoices.find((item) => String(item.id) === String(claim.invoice_id));
+                      return (
+                        <tr key={claim.id} className="border-b border-slate-100">
+                          <td className="px-3 py-3">{policy ? formatPolicyLabel(policy) : claim.policy_id || "--"}</td>
+                          <td className="px-3 py-3">{invoice ? formatInvoiceLabel(invoice) : claim.invoice_id ? `Invoice ${claim.invoice_id}` : "--"}</td>
+                          <td className="px-3 py-3">{formatAmount(claim.amount)}</td>
+                          <td className="px-3 py-3">{formatStatus(claim.status)}</td>
+                          <td className="px-3 py-3">
+                            {getClaimDocumentUrl(claim) ? (
+                              <a href={backendUrl(getClaimDocumentUrl(claim))} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100">
+                                <ExternalLink size={14} />
+                                View File
+                              </a>
+                            ) : (
+                              "--"
+                            )}
+                          </td>
+                          <td className="px-3 py-3">{claim.notes || "--"}</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-center text-slate-500">No claims submitted yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+      </main>
+>>>>>>> 7fdfd7e (committing the changes)
     </div>
   );
 }

@@ -449,12 +449,12 @@ export default function DoctorPage() {
 
           {/* Toolbar */}
           <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <Users className="text-sky-500" size={20} /> Patient Appointments
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">View and manage your consultation requests</p>
-            </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <Users className="text-sky-500" size={20} /> Patient Appointments
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Open an appointment to update status, notes, and request lab tests.</p>
+              </div>
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -550,14 +550,14 @@ export default function DoctorPage() {
                       <td className="p-4">
                         {renderStatusBadge(appt.status)}
                       </td>
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => router.push(`/doctor/appointments/${appt.id}`)}
-                          className="px-3 py-1.5 text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 rounded-lg transition"
-                        >
-                          Manage
-                        </button>
-                      </td>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => router.push(`/doctor/appointments/${appt.id}`)}
+                            className="px-3 py-1.5 text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 rounded-lg transition"
+                          >
+                            Manage / Lab
+                          </button>
+                        </td>
                     </tr>
                   ))
                 )}

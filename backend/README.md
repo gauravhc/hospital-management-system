@@ -62,7 +62,7 @@ cp .env.example .env
 
 ### 3. Create MySQL Database
 ```sql
-CREATE DATABASE hospital_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE hds_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 ### 4. Run Migrations

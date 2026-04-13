@@ -10,6 +10,7 @@ router.use(authMiddleware, hospitalScope);
 router.get("/invoices", asyncHandler(controller.invoices));
 router.post("/invoices", asyncHandler(controller.createInvoice));
 router.get("/invoices/:id", asyncHandler(controller.getInvoice));
+router.put("/invoices/:id/status", asyncHandler(controller.updateInvoiceStatus));
 router.get("/patient/:patientId", asyncHandler(controller.patientInvoices));
 
 module.exports = router;

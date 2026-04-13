@@ -13,7 +13,7 @@ const { testConnection } = require('./config/database');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents")]) {
+for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents"), path.join("uploads", "claim_documents")]) {
   fs.mkdirSync(path.join(process.cwd(), dir), { recursive: true });
 }
 

@@ -20,6 +20,15 @@ async function getTableColumns(table) {
   }
 }
 
+async function getScopedColumn(table, candidates) {
+  const cols = await getTableColumns(table);
+  return firstExistingColumn(cols, candidates);
+}
+
+async function getHospitalColumn(table) {
+  return getScopedColumn(table, ["hospital_id", "hospitalId"]);
+}
+
 function clearTableColumnsCache(table) {
   if (!table) {
     columnCache.clear();
@@ -31,5 +40,7 @@ function clearTableColumnsCache(table) {
 module.exports = {
   getTableColumns,
   firstExistingColumn,
+  getScopedColumn,
+  getHospitalColumn,
   clearTableColumnsCache,
 };

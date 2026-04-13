@@ -98,23 +98,16 @@ export const storageMap = {
 export default function AddInventoryItem() {
   const [form, setForm] = useState({
     name: "",
-    description: "",
     category: "",
-    subcategory: "",
-    brand: "",
     unit: "",
-    strengthSize: "",
-    packaging: "",
+    openingQuantity: "",
     reorderLevel: "",
-    reorderQuantity: "",
     unitCost: "",
-    sellingPrice: "",
-    expiryApplicable: true,
     supplier: "",
-    batchTracking: true,
-    location: "",
-    gstCode: "",
+    sku: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState("");
 
   // ️⃣ Handle Change
   const handleChange = (e) => {
@@ -124,8 +117,6 @@ export default function AddInventoryItem() {
       setForm({
         ...form,
         category: value,
-        subcategory: "",
-        location: "",
       });
       return;
     }
@@ -136,16 +127,31 @@ export default function AddInventoryItem() {
   // ️⃣ Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
+    setFeedback("");
 
     try {
-      const res = await apiPost(process.env.NEXT_PUBLIC_INVENTORY_ITEMS_API, form);
+      const payload = {
+        name: form.name,
+        sku: form.sku || null,
+        category: form.category || null,
+        quantity: Number(form.openingQuantity || 0),
+        reorder_level: Number(form.reorderLevel || 0),
+        unit: form.unit || null,
+        unit_cost: Number(form.unitCost || 0),
+        supplier_name: form.supplier || null,
+      };
+
+      const res = await apiPost("/api/inventory/items", payload);
       if (res) {
-        alert("Item added successfully!");
-        window.location.href = "/inventory/items";
+        setFeedback("Item added successfully.");
+        window.location.href = "/inventory/manageitems";
       }
     } catch (error) {
       console.error("Error adding item:", error);
-      alert("Error adding item.");
+      setFeedback(error?.message || "Error adding item.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -153,94 +159,132 @@ export default function AddInventoryItem() {
     <div className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Add Inventory Item</h1>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+      {feedback ? (
+        <div className={`mb-4 rounded border px-4 py-3 text-sm ${feedback.toLowerCase().includes("success") ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
+          {feedback}
+        </div>
+      ) : null}
 
-        <input className="border p-2" name="name" placeholder="Item Name" required onChange={handleChange} />
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <h2 className="text-lg font-semibold text-slate-900">Category and item details</h2>
+          <p className="mt-1 text-sm text-slate-500">Enter the basic item information and choose the category.</p>
 
-        <textarea className="border p-2" name="description" placeholder="Description" onChange={handleChange} />
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Item name</label>
+              <input
+                className="w-full rounded border p-2"
+                name="name"
+                placeholder="Paracetamol 500mg"
+                required
+                value={form.name}
+                onChange={handleChange}
+              />
+            </div>
 
-        {/* CATEGORY */}
-        <select
-          name="category"
-          value={form.category}
-          onChange={handleChange}
-          className="p-2 border rounded w-full"
-          required
-        >
-          <option value="">-- Select Category --</option>
-          {Object.keys(categoryOptions).map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Category</label>
+              <select
+                name="category"
+                value={form.category}
+                onChange={handleChange}
+                className="w-full rounded border p-2"
+                required
+              >
+                <option value="">Select category</option>
+                {Object.keys(categoryOptions).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* SUBCATEGORY */}
-        <select
-          name="subcategory"
-          value={form.subcategory}
-          onChange={handleChange}
-          className="p-2 border rounded w-full"
-          required
-          disabled={!form.category}
-        >
-          <option value="">-- Select Subcategory --</option>
-          {form.category &&
-            categoryOptions[form.category].map((sub) => (
-              <option key={sub} value={sub}>
-                {sub}
-              </option>
-            ))}
-        </select>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Unit</label>
+              <input
+                className="w-full rounded border p-2"
+                name="unit"
+                placeholder="tablet / bottle / piece"
+                value={form.unit}
+                onChange={handleChange}
+              />
+            </div>
 
-        <input className="border p-2" name="brand" placeholder="Brand" onChange={handleChange} />
-        <input className="border p-2" name="unit" placeholder="Unit (tablet/bottle/piece)" onChange={handleChange} />
-        <input className="border p-2" name="strengthSize" placeholder="Strength / Size" onChange={handleChange} />
-        <input className="border p-2" name="packaging" placeholder="Packaging" onChange={handleChange} />
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">SKU / Item code</label>
+              <input
+                className="w-full rounded border p-2"
+                name="sku"
+                placeholder="MED-1001"
+                value={form.sku}
+                onChange={handleChange}
+              />
+            </div>
 
-        <input className="border p-2" name="reorderLevel" type="number" placeholder="Reorder Level" onChange={handleChange} />
-        <input className="border p-2" name="reorderQuantity" type="number" placeholder="Reorder Quantity" onChange={handleChange} />
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">Supplier name</label>
+              <input
+                className="w-full rounded border p-2"
+                name="supplier"
+                placeholder="ABC Medical Suppliers"
+                value={form.supplier}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+        </div>
 
-        <input className="border p-2" name="unitCost" type="number" placeholder="Unit Cost" onChange={handleChange} />
-        <input className="border p-2" name="sellingPrice" type="number" placeholder="Selling Price" onChange={handleChange} />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <h2 className="text-lg font-semibold text-slate-900">Numeric values</h2>
+          <p className="mt-1 text-sm text-slate-500">These fields should contain numbers only.</p>
 
-        <input className="border p-2" name="supplier" placeholder="Supplier Name" onChange={handleChange} />
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Opening quantity</label>
+              <input
+                className="w-full rounded border p-2"
+                name="openingQuantity"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={form.openingQuantity}
+                onChange={handleChange}
+              />
+            </div>
 
-        {/* STORAGE LOCATION */}
-        <select
-          name="location"
-          value={form.location}
-          onChange={handleChange}
-          className="p-2 border rounded w-full"
-          required
-          disabled={!form.category}
-        >
-          <option value="">
-            {form.category ? "-- Select Storage Location --" : "Select category first"}
-          </option>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Reorder level</label>
+              <input
+                className="w-full rounded border p-2"
+                name="reorderLevel"
+                type="number"
+                min="0"
+                placeholder="10"
+                value={form.reorderLevel}
+                onChange={handleChange}
+              />
+            </div>
 
-          {form.category &&
-            storageMap[form.category]?.map((loc, idx) => (
-              <option key={idx} value={loc}>
-                {loc}
-              </option>
-            ))}
-        </select>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Unit cost</label>
+              <input
+                className="w-full rounded border p-2"
+                name="unitCost"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="25"
+                value={form.unitCost}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+        </div>
 
-        <input className="border p-2" name="gstCode" placeholder="GST/HST Code" onChange={handleChange} />
-
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="expiryApplicable" checked={form.expiryApplicable} onChange={handleChange} />
-          Expiry Applicable
-        </label>
-
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="batchTracking" checked={form.batchTracking} onChange={handleChange} />
-          Batch Tracking
-        </label>
-
-        <button className="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded">
-          Add Item
+        <button disabled={submitting} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white p-3 rounded">
+          {submitting ? "Saving..." : "Add Item"}
         </button>
       </form>
     </div>

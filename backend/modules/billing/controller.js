@@ -9,5 +9,6 @@ async function getInvoice(req, res) {
   return ok(res, row);
 }
 async function patientInvoices(req, res) { return ok(res, await service.patientInvoices(req.params.patientId)); }
+async function updateInvoiceStatus(req, res) { await service.updateInvoiceStatus(req.params.id, req.body || {}); return ok(res, null, "Invoice status updated"); }
 
-module.exports = { invoices, createInvoice, getInvoice, patientInvoices };
+module.exports = { invoices, createInvoice, getInvoice, patientInvoices, updateInvoiceStatus };

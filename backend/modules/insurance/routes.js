@@ -1,18 +1,41 @@
 const express = require("express");
+<<<<<<< HEAD
 const path = require("path");
 const multer = require("multer");
 const fs = require("fs");
+=======
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
+>>>>>>> 7fdfd7e (committing the changes)
 const controller = require("./controller");
 const authMiddleware = require("../../middleware/authMiddleware");
 const { hospitalScope } = require("../../middleware/roleMiddleware");
 const { asyncHandler } = require("../../services/module.helper");
 
 const router = express.Router();
+const uploadDir = path.join(__dirname, "..", "..", "uploads", "claim_documents");
+fs.mkdirSync(uploadDir, { recursive: true });
+
+const claimUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+      const safeName = String(file.originalname || "claim-document").replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `${Date.now()}-${safeName}`);
+    },
+  }),
+});
+
 router.use(authMiddleware, hospitalScope);
 
 router.get("/claims", asyncHandler(controller.claims));
-router.post("/claims", asyncHandler(controller.createClaim));
+router.post("/claims", claimUpload.single("attachment"), asyncHandler(controller.createClaim));
 router.put("/claims/:id", asyncHandler(controller.updateClaim));
+router.get("/insurance/details", asyncHandler(controller.patientInsuranceDetails));
+router.get("/insurance/details/:patientId", asyncHandler(controller.patientInsuranceDetails));
+router.post("/insurance/details", asyncHandler(controller.createPatientInsuranceDetail));
+router.put("/insurance/details/:id", asyncHandler(controller.updatePatientInsuranceDetail));
 router.get("/insurance/policies", asyncHandler(controller.policies));
 router.post("/insurance/policies", asyncHandler(controller.createPolicy));
 

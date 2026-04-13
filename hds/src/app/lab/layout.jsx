@@ -8,6 +8,7 @@ const NAV_ITEMS = [
     { name: "Dashboard", href: "/lab" },
     { name: "Test Requests", href: "/lab/requests" },
     { name: "Reports", href: "/lab/reports" },
+    { name: "Notifications", href: "/lab/notifications" },
 ];
 
 export default function LabLayout({ children }) {

@@ -43,20 +43,31 @@ async function createLegacyUserWithRole(payload, options = {}) {
     const userRole = normalizeUserRole(rawRole);
     const passwordHash = payload.passwordHash || (await bcrypt.hash(payload.password || "123456", 10));
 
+    const [userColumns] = await connection.execute(`SHOW COLUMNS FROM users`);
+    const availableUserColumns = new Set(userColumns.map((column) => column.Field));
+    const userValues = {};
+
+    if (availableUserColumns.has("full_name")) userValues.full_name = fullName;
+    if (availableUserColumns.has("name")) userValues.name = fullName;
+    if (availableUserColumns.has("first_name")) userValues.first_name = payload.first_name || fullName;
+    if (availableUserColumns.has("last_name")) userValues.last_name = payload.last_name || ".";
+    if (availableUserColumns.has("email")) userValues.email = email;
+    if (availableUserColumns.has("username")) userValues.username = email;
+    if (availableUserColumns.has("password")) userValues.password = passwordHash;
+    if (availableUserColumns.has("password_hash")) userValues.password_hash = passwordHash;
+    if (availableUserColumns.has("mobile")) userValues.mobile = phone;
+    if (availableUserColumns.has("phone")) userValues.phone = phone;
+    if (availableUserColumns.has("role")) userValues.role = userRole;
+    if (availableUserColumns.has("department")) userValues.department = payload.department ?? null;
+    if (availableUserColumns.has("specialization")) userValues.specialization = payload.specialization ?? null;
+    if (availableUserColumns.has("status")) userValues.status = payload.status || "active";
+    if (availableUserColumns.has("hospital_id")) userValues.hospital_id = hospitalId;
+
+    const userInsertColumns = Object.keys(userValues);
     const [userResult] = await connection.execute(
-      `INSERT INTO users (full_name, email, password, mobile, role, department, specialization, status, hospital_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        fullName,
-        email,
-        passwordHash,
-        phone,
-        userRole,
-        payload.department || null,
-        payload.specialization || null,
-        payload.status || "active",
-        hospitalId,
-      ]
+      `INSERT INTO users (${userInsertColumns.map((column) => `\`${column}\``).join(", ")})
+       VALUES (${userInsertColumns.map(() => "?").join(", ")})`,
+      userInsertColumns.map((column) => userValues[column])
     );
 
     const userId = userResult.insertId;
@@ -107,10 +118,27 @@ async function createLegacyUserWithRole(payload, options = {}) {
         break;
       }
       case "staff": {
+        const [staffColumns] = await connection.execute(`SHOW COLUMNS FROM staff`);
+        const available = new Set(staffColumns.map((column) => column.Field));
+        const values = {};
+
+        if (available.has("hospital_id")) values.hospital_id = hospitalId;
+        if (available.has("name")) values.name = fullName;
+        if (available.has("full_name")) values.full_name = fullName;
+        if (available.has("role")) values.role = payload.staff_role || rawRole || "staff";
+        if (available.has("phone")) values.phone = phone;
+        if (available.has("mobile")) values.mobile = phone;
+        if (available.has("email")) values.email = email;
+        if (available.has("password")) values.password = passwordHash;
+        if (available.has("password_hash")) values.password_hash = passwordHash;
+        if (available.has("department")) values.department = payload.department ?? null;
+        if (available.has("status")) values.status = payload.status || "active";
+
+        const columns = Object.keys(values);
         await connection.execute(
-          `INSERT INTO staff (hospital_id, name, role, phone, email)
-           VALUES (?, ?, ?, ?, ?)`,
-          [hospitalId, fullName, payload.staff_role || rawRole || "staff", phone, email]
+          `INSERT INTO staff (${columns.map((column) => `\`${column}\``).join(", ")})
+           VALUES (${columns.map(() => "?").join(", ")})`,
+          columns.map((column) => values[column])
         );
         break;
       }

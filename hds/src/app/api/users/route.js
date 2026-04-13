@@ -13,6 +13,7 @@ const ROLE_TABLE_MAP = {
   patient: "patients",
   hospital_admin: "hospital_admins",
   super_admin: "super_admins",
+  reception: "receptionists"
 };
 
 const normalizeRole = (role) => String(role || "").toLowerCase().trim().replace(/\s+/g, "_");

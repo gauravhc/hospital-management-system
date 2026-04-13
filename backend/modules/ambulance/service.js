@@ -1,13 +1,23 @@
 const { query } = require("../../config/database");
+const { getHospitalColumn } = require("../../services/dbMeta");
 
-function ambulances(hospitalId) {
-  return hospitalId
-    ? query(`SELECT * FROM ambulances WHERE hospital_id = ? ORDER BY id DESC`, [hospitalId])
+async function ambulances(hospitalId) {
+  const hospitalCol = await getHospitalColumn("ambulances");
+  return hospitalId && hospitalCol
+    ? query(`SELECT * FROM ambulances WHERE \`${hospitalCol}\` = ? ORDER BY id DESC`, [hospitalId])
     : query(`SELECT * FROM ambulances ORDER BY id DESC`);
 }
 
-function availableAmbulances(hospitalId) {
+async function availableAmbulances(hospitalId) {
+  const hospitalCol = await getHospitalColumn("ambulances");
   if (!hospitalId) {
+    return query(
+      `SELECT * FROM ambulances
+       WHERE LOWER(COALESCE(status, 'available')) = 'available'
+       ORDER BY id DESC`
+    );
+  }
+  if (!hospitalCol) {
     return query(
       `SELECT * FROM ambulances
        WHERE LOWER(COALESCE(status, 'available')) = 'available'
@@ -16,7 +26,7 @@ function availableAmbulances(hospitalId) {
   }
   return query(
     `SELECT * FROM ambulances
-     WHERE hospital_id = ? AND LOWER(COALESCE(status, 'available')) = 'available'
+     WHERE \`${hospitalCol}\` = ? AND LOWER(COALESCE(status, 'available')) = 'available'
      ORDER BY id DESC`,
     [hospitalId]
   );
@@ -69,9 +79,10 @@ function createRequest(payload, hospitalId) {
   );
 }
 
-function requests(hospitalId) {
-  return hospitalId
-    ? query(`SELECT * FROM ambulance_requests WHERE hospital_id = ? ORDER BY created_at DESC, id DESC`, [hospitalId])
+async function requests(hospitalId) {
+  const hospitalCol = await getHospitalColumn("ambulance_requests");
+  return hospitalId && hospitalCol
+    ? query(`SELECT * FROM ambulance_requests WHERE \`${hospitalCol}\` = ? ORDER BY created_at DESC, id DESC`, [hospitalId])
     : query(`SELECT * FROM ambulance_requests ORDER BY created_at DESC, id DESC`);
 }
 
@@ -151,6 +162,8 @@ async function latestPatientRequest(user) {
 async function hospitalRequests(user, { status } = {}) {
   const hospitalId = user?.hospital_id || null;
   if (!hospitalId) return [];
+  const hospitalCol = await getHospitalColumn("ambulance_requests");
+  const patientHospitalCol = await getHospitalColumn("patients");
 
   const ACTIVE_STATUSES = ["pending", "assigned", "enroute", "arrived"];
   const parseStatuses = (value) => {
@@ -167,10 +180,18 @@ async function hospitalRequests(user, { status } = {}) {
   const statuses = parseStatuses(status);
 
   const params = [hospitalId];
+<<<<<<< HEAD
   const whereParts = ["ar.hospital_id = ?"];
   if (statuses.length) {
     whereParts.push(`LOWER(REPLACE(ar.status, '_', '')) IN (${statuses.map(() => "?").join(", ")})`);
     params.push(...statuses);
+=======
+  let where = hospitalCol ? `WHERE ar.\`${hospitalCol}\` = ?` : "WHERE 1 = 1";
+  if (!hospitalCol) params.length = 0;
+  if (status) {
+    where += " AND LOWER(ar.status) = ?";
+    params.push(String(status).toLowerCase());
+>>>>>>> 7fdfd7e (committing the changes)
   }
 
   return query(
@@ -186,10 +207,16 @@ async function hospitalRequests(user, { status } = {}) {
 async function assignAmbulance(user, { request_id, ambulance_id, eta_minutes = null } = {}) {
   const hospitalId = user?.hospital_id || null;
   if (!hospitalId) throw new Error("Hospital not found");
+  const requestHospitalCol = await getHospitalColumn("ambulance_requests");
+  const ambulanceHospitalCol = await getHospitalColumn("ambulances");
+
+  if (!requestHospitalCol || !ambulanceHospitalCol) {
+    throw new Error("Ambulance schema is missing hospital mapping");
+  }
 
   const [reqRows, ambRows] = await Promise.all([
-    query(`SELECT * FROM ambulance_requests WHERE id = ? AND hospital_id = ? LIMIT 1`, [request_id, hospitalId]),
-    query(`SELECT * FROM ambulances WHERE id = ? AND hospital_id = ? LIMIT 1`, [ambulance_id, hospitalId]),
+    query(`SELECT * FROM ambulance_requests WHERE id = ? AND \`${requestHospitalCol}\` = ? LIMIT 1`, [request_id, hospitalId]),
+    query(`SELECT * FROM ambulances WHERE id = ? AND \`${ambulanceHospitalCol}\` = ? LIMIT 1`, [ambulance_id, hospitalId]),
   ]);
 
   if (!reqRows.length) {
@@ -220,7 +247,7 @@ async function assignAmbulance(user, { request_id, ambulance_id, eta_minutes = n
   await query(
     `UPDATE ambulance_requests
      SET ambulance_id = ?, driver_name = ?, driver_phone = ?, eta_minutes = ?, status = 'assigned'
-     WHERE id = ? AND hospital_id = ?`,
+     WHERE id = ? AND \`${requestHospitalCol}\` = ?`,
     [
       ambulance_id,
       ambulance.driver_name || null,
@@ -230,7 +257,7 @@ async function assignAmbulance(user, { request_id, ambulance_id, eta_minutes = n
       hospitalId,
     ]
   );
-  await query(`UPDATE ambulances SET status = 'busy' WHERE id = ? AND hospital_id = ?`, [
+  await query(`UPDATE ambulances SET status = 'busy' WHERE id = ? AND \`${ambulanceHospitalCol}\` = ?`, [
     ambulance_id,
     hospitalId,
   ]);
@@ -252,8 +279,14 @@ const STATUS_FLOW = {
 async function updateRequestStatus(user, { request_id, status } = {}) {
   const hospitalId = user?.hospital_id || null;
   if (!hospitalId) throw new Error("Hospital not found");
+  const requestHospitalCol = await getHospitalColumn("ambulance_requests");
+  const ambulanceHospitalCol = await getHospitalColumn("ambulances");
 
-  const rows = await query(`SELECT * FROM ambulance_requests WHERE id = ? AND hospital_id = ? LIMIT 1`, [
+  if (!requestHospitalCol || !ambulanceHospitalCol) {
+    throw new Error("Ambulance schema is missing hospital mapping");
+  }
+
+  const rows = await query(`SELECT * FROM ambulance_requests WHERE id = ? AND \`${requestHospitalCol}\` = ? LIMIT 1`, [
     request_id,
     hospitalId,
   ]);
@@ -278,14 +311,14 @@ async function updateRequestStatus(user, { request_id, status } = {}) {
     throw err;
   }
 
-  await query(`UPDATE ambulance_requests SET status = ? WHERE id = ? AND hospital_id = ?`, [
+  await query(`UPDATE ambulance_requests SET status = ? WHERE id = ? AND \`${requestHospitalCol}\` = ?`, [
     next,
     request_id,
     hospitalId,
   ]);
 
   if (next === "completed" && request.ambulance_id) {
-    await query(`UPDATE ambulances SET status = 'available' WHERE id = ? AND hospital_id = ?`, [
+    await query(`UPDATE ambulances SET status = 'available' WHERE id = ? AND \`${ambulanceHospitalCol}\` = ?`, [
       request.ambulance_id,
       hospitalId,
     ]);

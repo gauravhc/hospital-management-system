@@ -1,41 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPost } from "@/services/api";
 
 export default function AddStockBatch() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Static dropdown data
-  const suppliers = ["Apollo Pharma", "MedPlus", "Cipla", "Sun Pharma", "Local Vendor"];
-  const locations = ["Main Store", "Pharmacy Counter", "Emergency Store", "Ward A Store", "Ward B Store"];
-  const shelves = ["Shelf A1", "Shelf A2", "Shelf B1", "Shelf B2"];
-  const minimumLevels = [5, 10, 20, 50, 100];
-
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState("");
   const [form, setForm] = useState({
     itemId: "",
-    batchCode: "",
+    quantityToAdd: "",
     supplier: "",
-    supplierEmail: "",
-    mfgDate: "",
-    expiryDate: "",
-    quantity: "",
-    cost: "",
-    location: "",
-    shelf: "",
-    minimum: "",
-    dateReceived: "",
+    unitCost: "",
+    reorderLevel: "",
+    receivedDate: "",
+    note: "",
   });
 
-  // Load Items from backend
   useEffect(() => {
     const loadItems = async () => {
+      setLoading(true);
       try {
-        const data = await apiGet(process.env.NEXT_PUBLIC_INVENTORY_ITEMS_API);
-        setItems(Array.isArray(data) ? data : []);
+        const data = await apiGet("/api/inventory/items");
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        setItems(list);
       } catch (err) {
         console.error("Error loading items:", err);
+        setItems([]);
+        setFeedback(err?.message || "Unable to load inventory items.");
       } finally {
         setLoading(false);
       }
@@ -43,223 +36,212 @@ export default function AddStockBatch() {
     loadItems();
   }, []);
 
-  // Handle Input
+  const selectedItem = useMemo(
+    () => items.find((item) => String(item.id) === String(form.itemId)) || null,
+    [items, form.itemId]
+  );
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // Submit Form
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFeedback("");
 
-    const payload = {
-      itemId: form.itemId,
-      batchCode: form.batchCode,
-      supplier: form.supplier,
-      supplierName: form.supplier,
-      supplierEmail: form.supplierEmail,
-      expiryDate: form.expiryDate,
-      dateReceived: form.dateReceived,
-      quantity: Number(form.quantity),
-      cost: Number(form.cost),
-      location: form.location,
-      shelf: form.shelf,
-      minimum: Number(form.minimum),
-    };
+    if (!selectedItem) {
+      setFeedback("Select an inventory item first.");
+      return;
+    }
 
+    const addedQty = Math.max(0, Number(form.quantityToAdd || 0));
+    if (!addedQty) {
+      setFeedback("Enter a quantity to add.");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const res = await apiPost(`${process.env.NEXT_PUBLIC_INVENTORY_STOCK_API}/add`, payload);
-      if (res) {
-        alert("Stock batch added successfully!");
-        window.location.href = "/inventory";
-      }
+      const payload = {
+        item_id: selectedItem.id,
+        batch_code: `BATCH-${Date.now()}`,
+        quantity_added: addedQty,
+        supplier_name: form.supplier || selectedItem.supplier_name || null,
+        received_date: form.receivedDate || null,
+        unit_cost: form.unitCost !== "" ? Number(form.unitCost) : Number(selectedItem.unit_cost || 0),
+        minimum_level: form.reorderLevel !== "" ? Number(form.reorderLevel) : Number(selectedItem.reorder_level || 0),
+        note: form.note || null,
+      };
+
+      await apiPost("/api/inventory/batches", payload);
+      setFeedback("Stock batch recorded successfully.");
+
+      const refreshed = await apiGet("/api/inventory/items");
+      const list = Array.isArray(refreshed?.data) ? refreshed.data : Array.isArray(refreshed) ? refreshed : [];
+      setItems(list);
+      setForm({
+        itemId: "",
+        quantityToAdd: "",
+        supplier: "",
+        unitCost: "",
+        reorderLevel: "",
+        receivedDate: "",
+        note: "",
+      });
     } catch (error) {
-      console.error("Add batch error:", error);
-      alert("Failed to add stock batch.");
+      console.error("Add stock error:", error);
+      setFeedback(error?.message || "Failed to update stock.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded shadow mt-6">
-      <h1 className="text-3xl font-bold mb-4 text-center text-purple-700">
-        Add Stock Batch
-      </h1>
+    <div className="mx-auto mt-6 max-w-3xl rounded-2xl bg-white p-6 shadow">
+      <h1 className="text-center text-3xl font-bold text-purple-700">Add Stock</h1>
+      <p className="mt-2 text-center text-sm text-slate-500">
+        Select an existing inventory item and record a received stock batch against it.
+      </p>
+
+      {feedback ? (
+        <div
+          className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
+            feedback.toLowerCase().includes("success")
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-rose-200 bg-rose-50 text-rose-700"
+          }`}
+        >
+          {feedback}
+        </div>
+      ) : null}
 
       {loading ? (
-        <p className="text-center">Loading items...</p>
+        <p className="mt-6 text-center">Loading items...</p>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* ITEM SELECT */}
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <div>
-            <label className="block font-semibold mb-1">Select Item</label>
+            <label className="mb-1 block font-semibold">Select Item</label>
             <select
               name="itemId"
               required
-              className="w-full p-2 border rounded"
+              className="w-full rounded border p-2"
               value={form.itemId}
               onChange={handleChange}
             >
               <option value="">-- Select Item --</option>
               {items.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name}
+                  {item.name} ({item.sku || item.id}) - Current stock: {item.quantity || 0}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* BATCH CODE */}
-          <input
-            type="text"
-            name="batchCode"
-            placeholder="Batch Code"
-            className="w-full p-2 border rounded"
-            value={form.batchCode}
-            onChange={handleChange}
-            required
-          />
+          {selectedItem ? (
+            <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current quantity</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{selectedItem.quantity || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current reorder level</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{selectedItem.reorder_level || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Current unit cost</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{selectedItem.unit_cost || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Supplier</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900">{selectedItem.supplier_name || "--"}</p>
+              </div>
+            </div>
+          ) : null}
 
-          {/* SUPPLIER */}
-          <div>
-            <label className="block font-semibold mb-1">Supplier</label>
-            <select
-              name="supplier"
-              className="w-full p-2 border rounded"
-              value={form.supplier}
-              onChange={handleChange}
-            >
-              <option value="">-- Select Supplier --</option>
-              {suppliers.map((supplier, index) => (
-                <option key={index} value={supplier}>
-                  {supplier}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* SUPPLIER EMAIL */}
-          <div>
-            <label className="block font-semibold mb-1">Supplier Email</label>
-            <input
-              type="email"
-              name="supplierEmail"
-              placeholder="supplier@example.com"
-              className="w-full p-2 border rounded"
-              value={form.supplierEmail}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* DATE ROW */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block font-semibold">Date Received</label>
+              <label className="mb-1 block font-semibold">Quantity to add</label>
               <input
-                type="date"
-                name="dateReceived"
-                className="w-full p-2 border rounded"
-                value={form.dateReceived}
+                type="number"
+                name="quantityToAdd"
+                min="1"
+                placeholder="Enter quantity"
+                className="w-full rounded border p-2"
+                value={form.quantityToAdd}
                 onChange={handleChange}
                 required
               />
             </div>
 
             <div>
-              <label className="block font-semibold">Expiry Date</label>
+              <label className="mb-1 block font-semibold">Supplier</label>
+              <input
+                type="text"
+                name="supplier"
+                placeholder="Optional supplier override"
+                className="w-full rounded border p-2"
+                value={form.supplier}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block font-semibold">Unit cost</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="unitCost"
+                placeholder="Optional updated unit cost"
+                className="w-full rounded border p-2"
+                value={form.unitCost}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block font-semibold">Reorder level</label>
+              <input
+                type="number"
+                min="0"
+                name="reorderLevel"
+                placeholder="Optional updated reorder level"
+                className="w-full rounded border p-2"
+                value={form.reorderLevel}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block font-semibold">Received date</label>
               <input
                 type="date"
-                name="expiryDate"
-                className="w-full p-2 border rounded"
-                value={form.expiryDate}
+                name="receivedDate"
+                className="w-full rounded border p-2"
+                value={form.receivedDate}
                 onChange={handleChange}
-                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block font-semibold">Notes</label>
+              <input
+                type="text"
+                name="note"
+                placeholder="Optional receipt note"
+                className="w-full rounded border p-2"
+                value={form.note}
+                onChange={handleChange}
               />
             </div>
           </div>
 
-          {/* QUANTITY */}
-          <input
-            type="number"
-            name="quantity"
-            placeholder="Quantity"
-            className="w-full p-2 border rounded"
-            value={form.quantity}
-            onChange={handleChange}
-            required
-          />
-
-          {/* COST */}
-          <input
-            type="number"
-            step="0.01"
-            name="cost"
-            placeholder="Cost per Unit"
-            className="w-full p-2 border rounded"
-            value={form.cost}
-            onChange={handleChange}
-          />
-
-          {/* LOCATION */}
-          <div>
-            <label className="block font-semibold mb-1">Location</label>
-            <select
-              name="location"
-              className="w-full p-2 border rounded"
-              value={form.location}
-              onChange={handleChange}
-            >
-              <option value="">-- Select Location --</option>
-              {locations.map((loc, index) => (
-                <option key={index} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* SHELF */}
-          <div>
-            <label className="block font-semibold mb-1">Shelf</label>
-            <select
-              name="shelf"
-              className="w-full p-2 border rounded"
-              value={form.shelf}
-              onChange={handleChange}
-            >
-              <option value="">-- Select Shelf --</option>
-              {shelves.map((shelf, index) => (
-                <option key={index} value={shelf}>
-                  {shelf}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* MINIMUM STOCK */}
-          <div>
-            <label className="block font-semibold mb-1">Minimum Stock Level</label>
-            <select
-              name="minimum"
-              className="w-full p-2 border rounded"
-              value={form.minimum}
-              onChange={handleChange}
-            >
-              <option value="">-- Select Minimum Level --</option>
-              {minimumLevels.map((level, index) => (
-                <option key={index} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            className="w-full bg-purple-700 hover:bg-purple-800 text-white py-3 rounded text-lg"
+            disabled={submitting}
+            className="w-full rounded bg-purple-700 py-3 text-lg text-white hover:bg-purple-800 disabled:bg-purple-300"
           >
-            Add Batch
+            {submitting ? "Recording..." : "Add Stock Batch"}
           </button>
         </form>
       )}

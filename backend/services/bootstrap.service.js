@@ -2,6 +2,18 @@ const { query } = require("../config/database");
 const { getSchemaMode } = require("./schemaMode.service");
 const { getTableColumns, clearTableColumnsCache } = require("./dbMeta");
 
+function sanitizeCrossDatabaseForeignKeys(statement) {
+  let sql = String(statement || "");
+  sql = sql.replace(
+    /^\s*(?:CONSTRAINT\s+[^\s,]+\s+)?FOREIGN\s+KEY\s*\([^\)]*\)\s+REFERENCES\s+`?[a-zA-Z0-9_]+`?\s*\([^\)]*\)\s*(?:ON\s+DELETE\s+[^,\n]+)?\s*,?\s*$/gim,
+    ""
+  );
+
+  sql = sql.replace(/,\s*\)/g, "\n    )");
+  sql = sql.replace(/\n{3,}/g, "\n\n");
+  return sql;
+}
+
 const statements = [
   `
     CREATE TABLE IF NOT EXISTS hospitals (
@@ -325,6 +337,28 @@ const statements = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
   `
+    CREATE TABLE IF NOT EXISTS inventory_stock_batches (
+      id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+      hospital_id VARCHAR(36) NOT NULL,
+      item_id VARCHAR(36) NOT NULL,
+      batch_code VARCHAR(100) NULL,
+      supplier_name VARCHAR(255) NULL,
+      supplier_email VARCHAR(255) NULL,
+      received_date DATE NULL,
+      expiry_date DATE NULL,
+      quantity_added INT DEFAULT 0,
+      unit_cost DECIMAL(10,2) DEFAULT 0.00,
+      location VARCHAR(255) NULL,
+      shelf VARCHAR(255) NULL,
+      minimum_level INT DEFAULT 0,
+      note TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_inventory_stock_batches_hospital (hospital_id),
+      INDEX idx_inventory_stock_batches_item (item_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  `
     CREATE TABLE IF NOT EXISTS invoices (
       id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
       hospital_id VARCHAR(36) NOT NULL,
@@ -370,6 +404,7 @@ const statements = [
       amount DECIMAL(10,2) NOT NULL,
       status ENUM('submitted','under_review','approved','rejected') DEFAULT 'submitted',
       notes TEXT NULL,
+      attachment_url VARCHAR(500) NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_claims_hospital (hospital_id)
@@ -387,6 +422,26 @@ const statements = [
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_insurance_policies_hospital (hospital_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS patient_insurance_details (
+      id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+      hospital_id VARCHAR(36) NOT NULL,
+      patient_id VARCHAR(36) NOT NULL,
+      policy_id VARCHAR(36) NULL,
+      provider_name VARCHAR(255) NOT NULL,
+      policy_number VARCHAR(100) NOT NULL,
+      plan_name VARCHAR(255) NULL,
+      coverage_details TEXT NULL,
+      valid_till DATE NULL,
+      status ENUM('active','expired','inactive') DEFAULT 'active',
+      notes TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_patient_insurance_hospital (hospital_id),
+      INDEX idx_patient_insurance_patient (patient_id),
+      INDEX idx_patient_insurance_policy (policy_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
   `
@@ -429,6 +484,24 @@ const statements = [
       INDEX idx_patient_emergency_contacts_patient (patient_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
+  `
+    CREATE TABLE IF NOT EXISTS payroll_records (
+      id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+      hospital_id VARCHAR(36) NOT NULL,
+      employee_id VARCHAR(64) NOT NULL,
+      pay_period VARCHAR(30) NOT NULL,
+      basic_salary DECIMAL(10,2) DEFAULT 0.00,
+      allowances DECIMAL(10,2) DEFAULT 0.00,
+      deductions DECIMAL(10,2) DEFAULT 0.00,
+      net_salary DECIMAL(10,2) DEFAULT 0.00,
+      status ENUM('pending','processed','paid') DEFAULT 'pending',
+      paid_at TIMESTAMP NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_payroll_hospital (hospital_id),
+      INDEX idx_payroll_employee (employee_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `,
 ];
 
 async function ensureLegacyStaffSchema() {
@@ -467,6 +540,8 @@ async function ensureLegacyStaffSchema() {
   await addColumnIfMissing("password", "`password` VARCHAR(255) NOT NULL");
   await addColumnIfMissing("role", "`role` VARCHAR(50) NOT NULL");
   await addColumnIfMissing("hospital_id", "`hospital_id` INT NOT NULL");
+  await addColumnIfMissing("department", "`department` VARCHAR(150) NULL");
+  await addColumnIfMissing("status", "`status` VARCHAR(20) DEFAULT 'active'");
 }
 
 async function ensureLegacyRoleImageColumns() {
@@ -486,12 +561,18 @@ async function ensureLegacyRoleImageColumns() {
   await ensure("nurses");
 }
 
+<<<<<<< HEAD
 async function ensureStaffProfessionalColumns() {
   const ensure = async (table) => {
+=======
+async function ensureLegacyInsuranceSchema() {
+  const ensureColumns = async (table, definitions) => {
+>>>>>>> 7fdfd7e (committing the changes)
     clearTableColumnsCache(table);
     const cols = await getTableColumns(table);
     if (!cols) return;
 
+<<<<<<< HEAD
     const addColumnIfMissing = async (name, ddl) => {
       if (cols.has(name)) return;
       await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
@@ -544,6 +625,270 @@ async function ensureLabTestExtensions() {
   }
 }
 
+=======
+    for (const [name, ddl] of definitions) {
+      if (cols.has(name)) continue;
+      await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+      clearTableColumnsCache(table);
+    }
+  };
+
+  await ensureColumns("insurance_policies", [
+    ["policy_name", "`policy_name` VARCHAR(255) NULL"],
+    ["coverage_details", "`coverage_details` TEXT NULL"],
+    ["hospital_id", "`hospital_id` INT NULL"],
+    ["is_active", "`is_active` TINYINT(1) DEFAULT 1"],
+    ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+    ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ]);
+
+  await ensureColumns("claims", [
+      ["hospital_id", "`hospital_id` INT NULL"],
+      ["notes", "`notes` TEXT NULL"],
+      ["attachment_url", "`attachment_url` VARCHAR(500) NULL"],
+      ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+      ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+    ]);
+  }
+
+async function ensureLegacyBillingSchema() {
+  const ensureColumns = async (table, definitions) => {
+    clearTableColumnsCache(table);
+    const cols = await getTableColumns(table);
+    if (!cols) return;
+
+    for (const [name, ddl] of definitions) {
+      if (cols.has(name)) continue;
+      await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+      clearTableColumnsCache(table);
+    }
+  };
+
+  await ensureColumns("invoices", [
+    ["invoice_number", "`invoice_number` VARCHAR(100) NULL"],
+    ["appointment_id", "`appointment_id` INT NULL"],
+    ["subtotal", "`subtotal` DECIMAL(10,2) DEFAULT 0.00"],
+    ["tax_amount", "`tax_amount` DECIMAL(10,2) DEFAULT 0.00"],
+    ["discount_amount", "`discount_amount` DECIMAL(10,2) DEFAULT 0.00"],
+    ["bed_total", "`bed_total` DECIMAL(10,2) DEFAULT 0.00"],
+    ["surgery_total", "`surgery_total` DECIMAL(10,2) DEFAULT 0.00"],
+    ["paid_amount", "`paid_amount` DECIMAL(10,2) DEFAULT 0.00"],
+    ["due_amount", "`due_amount` DECIMAL(10,2) DEFAULT 0.00"],
+    ["payment_status", "`payment_status` VARCHAR(50) NULL"],
+    ["settlement_scope", "`settlement_scope` VARCHAR(50) NULL"],
+    ["payment_note", "`payment_note` TEXT NULL"],
+    ["payment_method", "`payment_method` VARCHAR(50) NULL"],
+    ["transaction_id", "`transaction_id` VARCHAR(100) NULL"],
+    ["billing_mode", "`billing_mode` VARCHAR(50) NULL"],
+    ["admission_date", "`admission_date` DATE NULL"],
+    ["discharge_date", "`discharge_date` DATE NULL"],
+    ["bed_type", "`bed_type` VARCHAR(100) NULL"],
+    ["bed_number", "`bed_number` VARCHAR(100) NULL"],
+    ["bed_price", "`bed_price` DECIMAL(10,2) DEFAULT 0.00"],
+    ["due_date", "`due_date` DATE NULL"],
+    ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ]);
+
+  await ensureColumns("invoice_items", [
+    ["notes", "`notes` TEXT NULL"],
+    ["service_date", "`service_date` DATE NULL"],
+    ["billing_type", "`billing_type` VARCHAR(50) NULL"],
+    ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+  ]);
+
+  await ensureColumns("payments", [
+    ["hospital_id", "`hospital_id` INT NULL"],
+    ["patient_id", "`patient_id` INT NULL"],
+    ["reference_no", "`reference_no` VARCHAR(100) NULL"],
+    ["status", "`status` VARCHAR(50) NULL"],
+    ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+    ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ]);
+}
+
+async function ensureLegacyLabSchema() {
+  const ensureColumns = async (table, definitions) => {
+    clearTableColumnsCache(table);
+    const cols = await getTableColumns(table);
+    if (!cols) return;
+
+    for (const [name, ddl] of definitions) {
+      if (cols.has(name)) continue;
+      await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+      clearTableColumnsCache(table);
+    }
+  };
+
+  await ensureColumns("lab_orders", [
+    ["hospital_id", "`hospital_id` INT NULL"],
+    ["test_name", "`test_name` VARCHAR(255) NULL"],
+    ["notes", "`notes` TEXT NULL"],
+    ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+    ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ]);
+
+  await ensureColumns("lab_reports", [
+    ["hospital_id", "`hospital_id` INT NULL"],
+    ["doctor_id", "`doctor_id` INT NULL"],
+    ["appointment_id", "`appointment_id` INT NULL"],
+    ["test_name", "`test_name` VARCHAR(255) NULL"],
+    ["notes", "`notes` TEXT NULL"],
+    ["report_url", "`report_url` VARCHAR(500) NULL"],
+    ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+    ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ]);
+}
+
+async function ensureLegacyInventorySchema() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS inventory_stock_batches (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      hospital_id INT NOT NULL,
+      item_id VARCHAR(36) NOT NULL,
+      batch_code VARCHAR(100) NULL,
+      supplier_name VARCHAR(255) NULL,
+      supplier_email VARCHAR(255) NULL,
+      received_date DATE NULL,
+      expiry_date DATE NULL,
+      quantity_added INT DEFAULT 0,
+      unit_cost DECIMAL(10,2) DEFAULT 0.00,
+      location VARCHAR(255) NULL,
+      shelf VARCHAR(255) NULL,
+      minimum_level INT DEFAULT 0,
+      note TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_inventory_stock_batches_hospital (hospital_id),
+      INDEX idx_inventory_stock_batches_item (item_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  clearTableColumnsCache("inventory_stock_batches");
+  const cols = await getTableColumns("inventory_stock_batches");
+  if (cols?.has("item_id")) {
+    const itemIdTypeRows = await query(`SHOW COLUMNS FROM inventory_stock_batches LIKE 'item_id'`);
+    const itemIdType = String(itemIdTypeRows[0]?.Type || "").toLowerCase();
+    if (itemIdType && itemIdType !== "varchar(36)") {
+      await query(`ALTER TABLE inventory_stock_batches MODIFY COLUMN item_id VARCHAR(36) NOT NULL`);
+    }
+  }
+}
+
+async function ensureLegacyHrSchema() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS payroll_records (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      hospital_id INT NOT NULL,
+      employee_id VARCHAR(64) NOT NULL,
+      pay_period VARCHAR(30) NOT NULL,
+      basic_salary DECIMAL(10,2) DEFAULT 0.00,
+      allowances DECIMAL(10,2) DEFAULT 0.00,
+      deductions DECIMAL(10,2) DEFAULT 0.00,
+      net_salary DECIMAL(10,2) DEFAULT 0.00,
+      status ENUM('pending','processed','paid') DEFAULT 'pending',
+      paid_at TIMESTAMP NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_payroll_hospital (hospital_id),
+      INDEX idx_payroll_employee (employee_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  clearTableColumnsCache("payroll_records");
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS leave_requests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      hospital_id INT NOT NULL,
+      staff_id INT NOT NULL,
+      leave_type VARCHAR(50) NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      total_days INT DEFAULT 1,
+      reason TEXT NULL,
+      status ENUM('pending','approved','rejected') DEFAULT 'pending',
+      reviewed_by INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_leave_hospital (hospital_id),
+      INDEX idx_leave_staff (staff_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  clearTableColumnsCache("leave_requests");
+}
+
+async function ensureLegacyPharmacySchema() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS pharmacy_prescriptions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      hospital_id INT NOT NULL,
+      patient_id INT NOT NULL,
+      doctor_id INT NULL,
+      status VARCHAR(30) DEFAULT 'active',
+      notes TEXT NULL,
+      image_url VARCHAR(500) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_pharmacy_prescriptions_hospital (hospital_id),
+      INDEX idx_pharmacy_prescriptions_patient (patient_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS pharmacy_prescription_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      prescription_id INT NOT NULL,
+      medicine_id INT NULL,
+      medicine_uuid VARCHAR(36) NULL,
+      quantity INT NOT NULL DEFAULT 1,
+      dosage VARCHAR(100) NULL,
+      frequency VARCHAR(100) NULL,
+      duration VARCHAR(100) NULL,
+      notes TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_pharmacy_prescription_items_prescription (prescription_id),
+      INDEX idx_pharmacy_prescription_items_medicine (medicine_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS pharmacy_order_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_id INT NOT NULL,
+      medicine_id INT NULL,
+      medicine_uuid VARCHAR(36) NULL,
+      quantity INT NOT NULL DEFAULT 1,
+      unit_price DECIMAL(10,2) DEFAULT 0.00,
+      gst_percent DECIMAL(10,2) DEFAULT 0.00,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_pharmacy_order_items_order (order_id),
+      INDEX idx_pharmacy_order_items_medicine (medicine_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS invoice_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      item_name VARCHAR(255) NOT NULL,
+      price DECIMAL(10,2) DEFAULT 0.00,
+      quantity INT DEFAULT 1,
+      notes TEXT NULL,
+      service_date DATE NULL,
+      billing_type VARCHAR(50) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_invoice_items_invoice (invoice_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  clearTableColumnsCache("pharmacy_prescriptions");
+  clearTableColumnsCache("pharmacy_prescription_items");
+  clearTableColumnsCache("pharmacy_order_items");
+  clearTableColumnsCache("invoice_items");
+}
+
+>>>>>>> 7fdfd7e (committing the changes)
 async function ensureErpRoleImageColumns() {
   const ensure = async (table) => {
     clearTableColumnsCache(table);
@@ -856,6 +1201,7 @@ async function ensureErpSchema() {
           "payments",
           "claims",
           "insurance_policies",
+          "patient_insurance_details",
           "patient_documents",
           "patient_medical_history",
           "patient_emergency_contacts",
@@ -873,12 +1219,21 @@ async function ensureErpSchema() {
       );
 
     for (const statement of legacyStatements) {
-      await query(statement);
+      await query(sanitizeCrossDatabaseForeignKeys(statement));
     }
 
     await ensureLegacyStaffSchema();
     await ensureLegacyRoleImageColumns();
+<<<<<<< HEAD
     await ensureStaffProfessionalColumns();
+=======
+    await ensureLegacyInsuranceSchema();
+    await ensureLegacyBillingSchema();
+    await ensureLegacyLabSchema();
+    await ensureLegacyInventorySchema();
+    await ensureLegacyHrSchema();
+    await ensureLegacyPharmacySchema();
+>>>>>>> 7fdfd7e (committing the changes)
     await ensureNurseModuleTables();
     await ensureNotificationsTable();
     await ensureHospitalExtensions();
@@ -890,7 +1245,7 @@ async function ensureErpSchema() {
   }
 
   for (const statement of statements) {
-    await query(statement);
+    await query(sanitizeCrossDatabaseForeignKeys(statement));
   }
 
   // Ensure profile images are supported for ERP mode role tables.

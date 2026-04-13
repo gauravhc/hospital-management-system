@@ -24,8 +24,9 @@ export default function InventoryItemsPage() {
 
   const fetchItems = async () => {
     try {
-      const data = await apiGet(process.env.NEXT_PUBLIC_INVENTORY_ITEMS_API);
-      setItems(Array.isArray(data) ? data : []);
+      const data = await apiGet("/api/inventory/items");
+      const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+      setItems(list);
       setFetchError(null);
     } catch (err) {
       console.error('Failed to fetch inventory items', err);
@@ -38,7 +39,7 @@ export default function InventoryItemsPage() {
     if (!confirm("Are you sure you want to delete this item?")) return;
 
     try {
-      await apiDelete(`${process.env.NEXT_PUBLIC_INVENTORY_ITEMS_API}/${id}`);
+      await apiDelete(`/api/inventory/items/${id}`);
       alert("Item deleted");
       fetchItems();
     } catch (err) {
@@ -49,8 +50,8 @@ export default function InventoryItemsPage() {
 
   const filteredItems = items.filter((item) => {
     return (
-      item.name.toLowerCase().includes(search.toLowerCase()) &&
-      (!filterCategory || item.category === filterCategory)
+      String(item.name || "").toLowerCase().includes(search.toLowerCase()) &&
+      (!filterCategory || String(item.category || "").includes(filterCategory))
     );
   });
 
@@ -59,7 +60,7 @@ export default function InventoryItemsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Inventory Items</h1>
         <Link
-          href="/inventory/items/add"
+          href="/inventory/additems"
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
         >
           + Add Item
@@ -112,8 +113,8 @@ export default function InventoryItemsPage() {
             <tr className="bg-gray-100 text-left">
               <th className="p-3">Name</th>
               <th className="p-3">Category</th>
-              <th className="p-3">Brand</th>
-              <th className="p-3">Unit / Strength</th>
+              <th className="p-3">SKU</th>
+              <th className="p-3">Unit</th>
               <th className="p-3">Reorder Level</th>
               <th className="p-3">Supplier</th>
               <th className="p-3 text-center">Actions</th>
@@ -135,21 +136,12 @@ export default function InventoryItemsPage() {
                 >
                   <td className="p-3 font-medium">{item.name}</td>
                   <td className="p-3">{item.category}</td>
-                  <td className="p-3">{item.brand}</td>
-                  <td className="p-3">
-                    {item.unit} / {item.strengthSize}
-                  </td>
-                  <td className="p-3">{item.reorderLevel}</td>
-                  <td className="p-3">{item.supplier}</td>
+                  <td className="p-3">{item.sku || "--"}</td>
+                  <td className="p-3">{item.unit || "--"}</td>
+                  <td className="p-3">{item.reorder_level ?? "--"}</td>
+                  <td className="p-3">{item.supplier_name || "--"}</td>
 
                   <td className="p-3 text-center space-x-2">
-                    <Link
-                      href={`/ inventory / items / edit / ${item.id} `}
-                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                    >
-                      Edit
-                    </Link>
-
                     <button
                       onClick={() => handleDelete(item.id)}
                       className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"

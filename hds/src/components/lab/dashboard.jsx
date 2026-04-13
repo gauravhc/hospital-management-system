@@ -1,425 +1,482 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPost } from "@/services/api";
 import backendUrl from "@/lib/backendUrl";
 import {
-  TestTube,
-  Microscope,
   FileText,
-  UploadCloud,
-  LogOut,
-  User,
+  FlaskConical,
+  Microscope,
   Search,
-  CheckCircle,
-  Clock,
-  AlertCircle
 } from "lucide-react";
+
+const pageShell =
+  "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.10),_transparent_32%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]";
+const surfaceCard =
+  "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
+
+const normalizeStatus = (value) => {
+  const raw = String(value || "pending").trim().toLowerCase();
+  if (raw === "in-progress") return "In Progress";
+  return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const statusTone = (value) => {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized === "completed") return "bg-emerald-100 text-emerald-700";
+  if (normalized === "in-progress") return "bg-sky-100 text-sky-700";
+  return "bg-amber-100 text-amber-700";
+};
 
 export default function LabPage() {
   const router = useRouter();
-
   const [username, setUsername] = useState("Lab Tech");
-  const [greeting, setGreeting] = useState("Welcome");
-  const [isDark, setIsDark] = useState(false);
-  const [avatar, setAvatar] = useState("");
-
   const [tests, setTests] = useState([]);
-  const [filteredTests, setFilteredTests] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const [openTest, setOpenTest] = useState(null);
-  const [file, setFile] = useState([]);
-  const [comment, setComment] = useState("");
-
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedTest, setSelectedTest] = useState(null);
+  const [comment, setComment] = useState("");
+  const [files, setFiles] = useState([]);
+  const [feedback, setFeedback] = useState({ type: "", text: "" });
 
-  // Init
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
     const user = localStorage.getItem("username");
 
-    if (!token || role !== "lab") {
+    if (!token || !(role === "lab" || role === "labtechnician")) {
       router.push("/login");
       return;
     }
+
     setUsername(user || "Lab Tech");
-
-    // Greeting
-    const hr = new Date().getHours();
-    setGreeting(hr < 12 ? "Good Morning" : hr < 17 ? "Good Afternoon" : "Good Evening");
-
-    // Theme
-    const stored = localStorage.getItem("theme_mode");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setIsDark(stored === "dark" || (!stored && prefersDark));
-
     fetchTests();
-  }, []);
+  }, [router]);
 
   const fetchTests = async () => {
     setLoading(true);
     try {
       const data = await apiGet("/api/lab");
-      const list = data.data || [];
+      const list = Array.isArray(data?.data) ? data.data : [];
       setTests(list);
-      setFilteredTests(list);
-    } catch (err) {
-      console.error("Fetch tests error:", err);
+
+      if (selectedTest?.id) {
+        const refreshed = list.find((item) => String(item.id) === String(selectedTest.id));
+        if (refreshed) {
+          setSelectedTest(refreshed);
+          setComment(refreshed.comments || "");
+        }
+      }
+    } catch (error) {
+      console.error("Fetch tests error:", error);
       setTests([]);
-      setFilteredTests([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Search & Filter
-  const applyFilters = (allTests, searchVal, statusVal) => {
-    let result = [...allTests];
-    const q = searchVal.trim().toLowerCase();
+  const filteredTests = useMemo(() => {
+    const query = String(search || "").trim().toLowerCase();
+    let rows = [...tests];
 
-    if (q) {
-      result = result.filter(
-        (t) =>
-          (t.patientName || "").toLowerCase().includes(q) ||
-          t.patient_id?.toLowerCase().includes(q) ||
-          (t.testName || "").toLowerCase().includes(q) ||
-          t.status?.toLowerCase().includes(q)
-      );
+    if (query) {
+      rows = rows.filter((test) => {
+        return (
+          String(test?.patientName || test?.patient_name || "").toLowerCase().includes(query) ||
+          String(test?.patient_id || "").toLowerCase().includes(query) ||
+          String(test?.doctorName || test?.doctor_name || "").toLowerCase().includes(query) ||
+          String(test?.testName || test?.test_name || "").toLowerCase().includes(query) ||
+          String(test?.status || "").toLowerCase().includes(query)
+        );
+      });
     }
 
-    if (statusVal !== "all") {
-      result = result.filter(t => (t.status || "").toLowerCase() === statusVal.toLowerCase());
+    if (statusFilter !== "all") {
+      rows = rows.filter((test) => String(test?.status || "").toLowerCase() === statusFilter);
     }
 
-    setFilteredTests(result);
-  };
+    return rows;
+  }, [search, statusFilter, tests]);
 
-  const handleSearchChange = (v) => {
-    setSearch(v);
-    applyFilters(tests, v, statusFilter);
-  };
+  const summary = useMemo(() => {
+    const pending = tests.filter((test) => String(test?.status || "").toLowerCase() === "pending").length;
+    const completed = tests.filter((test) => String(test?.status || "").toLowerCase() === "completed").length;
+    const urgent = tests.filter((test) => {
+      const notes = String(test?.notes || test?.comments || "").toLowerCase();
+      return notes.includes("urgent") || notes.includes("stat");
+    }).length;
 
-  const handleStatusFilter = (v) => {
-    setStatusFilter(v);
-    applyFilters(tests, search, v);
-  };
+    return {
+      total: tests.length,
+      pending,
+      completed,
+      urgent,
+    };
+  }, [tests]);
+
+  const highlightedTests = useMemo(() => filteredTests.slice(0, 6), [filteredTests]);
+  const completedPreview = useMemo(() => {
+    return tests
+      .filter((test) => String(test?.status || "").toLowerCase() === "completed")
+      .slice(0, 4);
+  }, [tests]);
 
   const openFor = (test) => {
-    setOpenTest(test);
-    setComment(test.comments || "");
-    setFile([]);
+    setSelectedTest(test);
+    setComment(test?.comments || "");
+    setFiles([]);
+    setFeedback({ type: "", text: "" });
   };
 
   const handleUpload = async () => {
-    if (!openTest) return alert("No test selected");
-    if ((!file || file.length === 0) && !comment) return alert("Provide a PDF file or a comment");
-
-    const token = localStorage.getItem("token");
-    const form = new FormData();
-    if (file && file.length > 0) {
-      file.forEach((f) => form.append("reports", f));
+    if (!selectedTest?.id) {
+      setFeedback({ type: "error", text: "Select a test before uploading a result." });
+      return;
     }
-    if (comment) form.append("comment", comment);
+
+    if (!files.length && !comment.trim()) {
+      setFeedback({ type: "error", text: "Attach a PDF file or enter lab comments first." });
+      return;
+    }
+
+    setSubmitting(true);
+    setFeedback({ type: "", text: "" });
 
     try {
-      // apiPost with isForm = true
-      // Note: Endpoint expects POST for update
-      const res = await apiPost(
-        `/api/lab/update-result/${openTest.id}`,
-        form,
-        token,
-        true // isForm
-      );
-
-      if (res && (res.success || res.status === 200 || res.status === 201)) {
-        alert("Report uploaded successfully");
-        await fetchTests();
-
-        // Update local selected test to show updated state immediately?
-        // Ideally fetchTests refreshes list, but we should clear selection or re-select.
-        setOpenTest(null);
-        setFile([]);
-        setComment("");
-      } else {
-        alert(res.message || "Upload failed");
+      const token = localStorage.getItem("token");
+      const form = new FormData();
+      files.forEach((file) => form.append("reports", file));
+      if (comment.trim()) {
+        form.append("comment", comment.trim());
       }
-    } catch (err) {
-      console.error(err);
-      alert("Server error uploading report");
+
+      const response = await apiPost(`/api/lab/update-result/${selectedTest.id}`, form, token, true);
+      if (!response?.success) {
+        setFeedback({ type: "error", text: response?.message || "Failed to upload the report." });
+        return;
+      }
+
+      setFeedback({ type: "success", text: "Lab report uploaded and request marked complete." });
+      setSelectedTest(null);
+      setComment("");
+      setFiles([]);
+      await fetchTests();
+    } catch (error) {
+      console.error(error);
+      setFeedback({ type: "error", text: error?.message || "Server error while uploading the report." });
+    } finally {
+      setSubmitting(false);
     }
   };
-
-
 
   const downloadReport = (url) => {
-    // If external URL or full path logic needed
-    const finalUrl = backendUrl(url);
-    window.open(finalUrl, '_blank');
-  };
-
-  // Stats
-  const totalTests = tests.length;
-  const pendingCount = tests.filter(t => (t.status || "").toLowerCase() === "pending").length;
-  const completedCount = tests.filter(t => (t.status || "").toLowerCase() === "completed").length;
-
-  const renderStatusPill = (status) => {
-    const s = (status || "pending").toLowerCase();
-    let colorClass, icon;
-
-    if (s === "completed") {
-      colorClass = "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-      icon = <CheckCircle size={12} className="mr-1" />;
-    } else if (s === "in-progress") {
-      colorClass = "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400";
-      icon = <Clock size={12} className="mr-1" />;
-    } else {
-      colorClass = "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-      icon = <AlertCircle size={12} className="mr-1" />;
+    let resolvedUrl = url;
+    try {
+      const parsed = JSON.parse(String(url || ""));
+      if (Array.isArray(parsed) && parsed[0]) {
+        resolvedUrl = parsed[0];
+      } else if (typeof parsed === "string" && parsed) {
+        resolvedUrl = parsed;
+      }
+    } catch {
+      resolvedUrl = url;
     }
-
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
-        {icon}
-        {s.charAt(0).toUpperCase() + s.slice(1)}
-      </span>
-    );
+    const finalUrl = backendUrl(resolvedUrl);
+    window.open(finalUrl, "_blank");
   };
 
   return (
-    <div className={`${isDark ? "bg-slate-900 text-slate-100" : "bg-slate-50 text-slate-900"} min-h-screen flex flex-col`}>
-
-      <main
-        className="flex-1 px-6 py-8"
-        style={{
-          backgroundImage: "url('/images/Bg-image.webp')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* HEADER */}
-        <div className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between mb-6 border border-white/20 gap-4 md:gap-0">
-          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-5 w-full md:w-auto text-center sm:text-left">
-            <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center shadow-inner border border-slate-100">
-              <Microscope className="w-8 h-8 md:w-10 md:h-10 text-violet-400" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Lab Dashboard</p>
-              <h2 className="text-xl md:text-3xl font-extrabold text-slate-800 dark:text-white">
-                {greeting}, <span className="text-violet-500">{username}</span>
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-300">
-                Manage test requests & reports
+    <div className={pageShell}>
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        <section className="rounded-[32px] bg-gradient-to-r from-slate-900 via-sky-800 to-cyan-700 px-6 py-7 text-white shadow-[0_24px_60px_-28px_rgba(14,165,233,0.45)] md:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-100">Lab Desk</p>
+              <h1 className="mt-2 text-3xl font-bold md:text-4xl">Diagnostic dashboard</h1>
+              <p className="mt-3 text-sm text-sky-50 md:text-base">
+                Track pending samples, process incoming test requests, and complete reports from one technician workspace.
               </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-2 w-full md:w-auto md:justify-end">
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-200 hover:bg-slate-50 transition shadow-sm">
-              <User size={18} /> Profile
-            </button>
-
-          </div>
-        </div>
-
-        {/* STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="relative overflow-hidden bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-900/40 dark:to-violet-800/20 p-6 rounded-2xl border border-violet-100 dark:border-violet-800 shadow-sm">
-            <div className="relative z-10">
-              <p className="text-violet-600 dark:text-violet-300 font-medium text-sm">Total Tests</p>
-              <h3 className="text-3xl font-extrabold text-violet-900 dark:text-white mt-1">{totalTests}</h3>
-            </div>
-            <TestTube className="absolute right-4 bottom-4 text-violet-200 dark:text-violet-800/50 w-16 h-16" />
-          </div>
-
-          <div className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/40 dark:to-amber-800/20 p-6 rounded-2xl border border-amber-100 dark:border-amber-800 shadow-sm">
-            <div className="relative z-10">
-              <p className="text-amber-600 dark:text-amber-300 font-medium text-sm">Pending</p>
-              <h3 className="text-3xl font-extrabold text-amber-900 dark:text-white mt-1">{pendingCount}</h3>
-            </div>
-            <AlertCircle className="absolute right-4 bottom-4 text-amber-200 dark:text-amber-800/50 w-16 h-16" />
-          </div>
-
-          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/40 dark:to-emerald-800/20 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-800 shadow-sm">
-            <div className="relative z-10">
-              <p className="text-emerald-600 dark:text-emerald-300 font-medium text-sm">Completed</p>
-              <h3 className="text-3xl font-extrabold text-emerald-900 dark:text-white mt-1">{completedCount}</h3>
-            </div>
-            <CheckCircle className="absolute right-4 bottom-4 text-emerald-200 dark:text-emerald-800/50 w-16 h-16" />
-          </div>
-        </div>
-
-        {/* MAIN LAYOUT: List Left, Detail Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-          {/* LEFT: Test List */}
-          <div className="col-span-1 lg:col-span-7 bg-white/95 dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 flex flex-col h-[600px]">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 dark:border-slate-700">
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-3">
-                <TestTube className="text-violet-500" size={20} /> Tests List
-              </h3>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search tests..."
-                    value={search}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => handleStatusFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none"
-                >
-                  <option value="all">All</option>
-                  <option value="pending">Pending</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+              <p className="mt-3 text-sm text-sky-100">Working as {username}</p>
             </div>
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-2">
-              {filteredTests.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm">
-                  <Microscope size={40} className="mb-2 opacity-50" />
-                  <p>No tests found</p>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/lab/requests" className="rounded-full bg-white/14 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/22">
+                Test Requests
+              </Link>
+              <Link href="/lab/reports" className="rounded-full bg-white/14 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/22">
+                Reports Archive
+              </Link>
+              <Link href="/lab/notifications" className="rounded-full bg-white/14 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/22">
+                Notifications
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className={surfaceCard}>
+            <p className="text-sm text-slate-500">Total requests</p>
+            <p className="mt-3 text-3xl font-bold text-slate-900">{summary.total}</p>
+          </div>
+          <div className="rounded-[28px] border border-amber-100 bg-amber-50/95 p-6 shadow-[0_16px_40px_-28px_rgba(245,158,11,0.45)]">
+            <p className="text-sm text-amber-700">Pending queue</p>
+            <p className="mt-3 text-3xl font-bold text-amber-900">{summary.pending}</p>
+          </div>
+          <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/95 p-6 shadow-[0_16px_40px_-28px_rgba(16,185,129,0.45)]">
+            <p className="text-sm text-emerald-700">Completed</p>
+            <p className="mt-3 text-3xl font-bold text-emerald-900">{summary.completed}</p>
+          </div>
+          <div className="rounded-[28px] border border-rose-100 bg-rose-50/95 p-6 shadow-[0_16px_40px_-28px_rgba(244,63,94,0.45)]">
+            <p className="text-sm text-rose-700">Urgent signals</p>
+            <p className="mt-3 text-3xl font-bold text-rose-900">{summary.urgent}</p>
+          </div>
+        </section>
+
+        <section className={surfaceCard}>
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Search and filter</h2>
+            <p className="text-sm text-slate-500">Find a patient, test, doctor, or narrow the live request queue by status.</p>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.5fr_0.8fr]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search patient, ID, doctor, test, or status"
+                className="w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 py-3 text-sm outline-none transition focus:border-sky-500"
+              />
+            </label>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
+            >
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="in-progress">In Progress</option>
+            </select>
+          </div>
+        </section>
+
+        <section className={surfaceCard}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Active request queue</h2>
+              <p className="text-sm text-slate-500">Select a request to view details and upload the result from this dashboard.</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {loading ? "Loading..." : `${filteredTests.length} request(s)`}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-3">
+              {highlightedTests.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 px-5 py-12 text-center text-sm text-slate-500">
+                  No lab requests found for the current filters.
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {filteredTests.map(t => {
-                    const isActive = openTest && openTest.id === t.id;
-                    return (
-                      <div
-                        key={t.id}
-                        onClick={() => openFor(t)}
-                        className={`
-                                  group flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all
-                                  ${isActive
-                            ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20"
-                            : "border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800/50 hover:border-violet-200 dark:hover:border-violet-800"
-                          }
-                               `}
-                      >
-                        <div className={`p-2 rounded-full ${isActive ? 'bg-violet-100 text-violet-600' : 'bg-slate-100 text-slate-500'}`}>
-                          <TestTube size={18} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-start">
-                            <h4 className={`text-sm font-bold ${isActive ? 'text-violet-900 dark:text-violet-100' : 'text-slate-800 dark:text-slate-200'}`}>
-                              {t.testName}
-                            </h4>
-                            {renderStatusPill(t.status)}
+                highlightedTests.map((test, index) => {
+                  const active = String(selectedTest?.id || "") === String(test?.id || "");
+                  const notes = String(test?.notes || test?.comments || "").trim();
+
+                  return (
+                    <button
+                      key={test.id || index}
+                      type="button"
+                      onClick={() => openFor(test)}
+                      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                        active ? "border-sky-400 bg-sky-50" : "border-slate-200 bg-slate-50/80 hover:border-sky-200 hover:bg-sky-50/60"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <FlaskConical className="h-4 w-4 text-sky-600" />
+                            <p className="font-semibold text-slate-900">{test.testName || test.test_name || "Lab Test"}</p>
                           </div>
-                          <div className="mt-1 flex justify-between items-center">
-                            <p className="text-xs text-slate-500">Patient: <span className="font-medium">{t.patientName}</span></p>
-                            <span className="text-[10px] text-slate-400">{t.patient_id}</span>
-                          </div>
+                          <p className="text-sm text-slate-500">
+                            {test.patientName || "--"} | {test.patient_id || "--"}
+                          </p>
+                          <p className="text-xs text-slate-400">Requested by {test.doctorName || "--"}</p>
+                          {notes ? <p className="text-xs text-slate-500">Notes: {notes}</p> : null}
                         </div>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(test.status)}`}>
+                          {normalizeStatus(test.status)}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+                    </button>
+                  );
+                })
               )}
             </div>
-          </div>
 
-          {/* RIGHT: Detail View */}
-          <div className="col-span-1 lg:col-span-5 flex flex-col gap-6">
-            <div className="bg-white/95 dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 p-5 h-full flex flex-col">
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4 pb-4 border-b border-slate-100 dark:border-slate-700">
-                <FileText className="text-sky-500" size={20} />
-                {openTest ? "Test Details & Report" : "Select a Test"}
-              </h3>
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-slate-900">Technician action panel</h3>
+                <Microscope className="h-5 w-5 text-sky-600" />
+              </div>
 
-              {!openTest ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-sm opacity-60">
-                  <UploadCloud size={60} strokeWidth={1} className="mb-4" />
-                  <p>Select a test to upload reports</p>
+              {!selectedTest ? (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-300 px-5 py-12 text-center text-sm text-slate-500">
+                  Choose a request from the queue to review the patient context and upload the report.
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col">
-                  {/* Details */}
-                  <div className="space-y-3 mb-6">
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-                        <p className="text-slate-500 uppercase">Patient</p>
-                        <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm truncate">{openTest.patientName}</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
-                        <p className="text-slate-500 uppercase">Referring Dr</p>
-                        <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm truncate">{openTest.doctorName}</p>
-                      </div>
+                <div className="mt-5 space-y-5">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Patient</p>
+                      <p className="mt-2 font-semibold text-slate-900">{selectedTest.patientName || "--"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{selectedTest.patient_id || "--"}</p>
                     </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Referring doctor</p>
+                      <p className="mt-2 font-semibold text-slate-900">{selectedTest.doctorName || "--"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{normalizeStatus(selectedTest.status)}</p>
+                    </div>
+                  </div>
 
-                    {openTest.result && (
-                      <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 flex justify-between items-center">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Requested test</p>
+                    <p className="mt-2 font-semibold text-slate-900">{selectedTest.testName || selectedTest.test_name || "--"}</p>
+                    {selectedTest.notes ? <p className="mt-2 text-sm text-slate-500">{selectedTest.notes}</p> : null}
+                  </div>
+
+                  {selectedTest.result ? (
+                    <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                          <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300 uppercase">Existing Report</p>
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400">Available for download</p>
+                          <p className="text-xs uppercase tracking-wide text-sky-700">Existing report file</p>
+                          <p className="mt-1 text-sm text-sky-800">A report is already attached for this request.</p>
                         </div>
                         <button
-                          onClick={() => downloadReport(openTest.result)}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg transition shadow-sm"
+                          type="button"
+                          onClick={() => downloadReport(selectedTest.result)}
+                          className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
                         >
-                          Download
+                          Open file
                         </button>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Upload Form */}
-                  <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-700">
-                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
-                      <UploadCloud size={16} /> Upload New Report
-                    </h4>
-                    <div className="space-y-3">
-                      <label className="block w-full cursor-pointer">
-                        <input
-                          type="file"
-                          multiple
-                          accept="application/pdf"
-                          onChange={(e) => setFile(Array.from(e.target.files || []))}
-                          className="hidden"
-                        />
-                        <div className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-violet-300 transition text-center">
-                          {file.length > 0 ? (
-                            <p className="text-sm text-violet-600 font-medium">{file.length} <span className="text-slate-500 font-normal">file(s) selected</span></p>
-                          ) : (
-                            <p className="text-sm text-slate-500">Click to select PDF files</p>
-                          )}
-                        </div>
-                      </label>
-
-                      <textarea
-                        placeholder="Report comments..."
-                        rows={2}
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 transition resize-none"
-                      ></textarea>
-
-                      <button
-                        onClick={handleUpload}
-                        className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-200 dark:shadow-violet-900/20 font-medium transition"
-                      >
-                        Upload & Complete
-                      </button>
                     </div>
+                  ) : null}
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-700">Upload PDF report</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="application/pdf"
+                      onChange={(event) => setFiles(Array.from(event.target.files || []))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                    />
+                    <p className="text-xs text-slate-500">
+                      {files.length ? `${files.length} file(s) selected` : "Attach one or more PDF result files."}
+                    </p>
                   </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-700">Lab comments</label>
+                    <textarea
+                      rows={4}
+                      value={comment}
+                      onChange={(event) => setComment(event.target.value)}
+                      placeholder="Enter result notes, process remarks, or final findings"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                    />
+                  </div>
+
+                  {feedback.text ? (
+                    <div className={`rounded-2xl px-4 py-3 text-sm ${feedback.type === "error" ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
+                      {feedback.text}
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleUpload}
+                    disabled={submitting}
+                    className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+                  >
+                    {submitting ? "Uploading..." : "Upload and complete request"}
+                  </button>
                 </div>
               )}
             </div>
           </div>
-        </div>
-      </main>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
+          <div className={surfaceCard}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Recent completions</h2>
+                <p className="text-sm text-slate-500">Latest completed tests visible from the technician queue.</p>
+              </div>
+              <Link href="/lab/reports" className="text-sm font-semibold text-sky-700">
+                Open reports
+              </Link>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {completedPreview.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 px-5 py-10 text-center text-sm text-slate-500">
+                  No completed lab requests yet.
+                </div>
+              ) : (
+                completedPreview.map((test, index) => (
+                  <div key={test.id || index} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-900">{test.testName || test.test_name || "Lab Test"}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {test.patientName || "--"} | Requested by {test.doctorName || "--"}
+                        </p>
+                      </div>
+                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        Completed
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className={surfaceCard}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Technician workflow</h2>
+                <p className="text-sm text-slate-500">A clear reminder of how the lab module fits into daily work.</p>
+              </div>
+              <FileText className="h-5 w-5 text-sky-600" />
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-sm font-semibold text-slate-900">1. Review test requests</p>
+                <p className="mt-1 text-sm text-slate-500">Use the dashboard or the dedicated requests page to process newly ordered tests.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-sm font-semibold text-slate-900">2. Upload report files and findings</p>
+                <p className="mt-1 text-sm text-slate-500">Attach PDFs, add comments, and complete the request once the lab result is ready.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-sm font-semibold text-slate-900">3. Confirm published reports</p>
+                <p className="mt-1 text-sm text-slate-500">Use the reports archive and notifications feed to track what still needs attention.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

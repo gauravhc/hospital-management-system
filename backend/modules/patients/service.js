@@ -34,21 +34,41 @@ async function list(hospitalId) {
   if (!patientCols) return [];
 
   const patientIdCol = firstExistingColumn(patientCols, ["id", "patient_id"]);
+  const externalPatientIdCol = firstExistingColumn(patientCols, ["patient_id", "patient_id_no"]);
   const patientHospitalCol = firstExistingColumn(patientCols, ["hospital_id"]);
   const nameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
+<<<<<<< HEAD
   const firstNameCol = firstExistingColumn(patientCols, ["first_name", "firstname", "given_name"]);
   const lastNameCol = firstExistingColumn(patientCols, ["last_name", "lastname", "surname", "family_name"]);
+=======
+  const firstNameCol = firstExistingColumn(patientCols, ["first_name"]);
+  const lastNameCol = firstExistingColumn(patientCols, ["last_name"]);
+>>>>>>> 7fdfd7e (committing the changes)
   const phoneCol = firstExistingColumn(patientCols, ["phone", "mobile"]);
   const emailCol = firstExistingColumn(patientCols, ["email"]);
+  const createdAtCol = firstExistingColumn(patientCols, ["created_at"]);
+
+  const nameExpr = nameCol
+    ? `p.\`${nameCol}\``
+    : firstNameCol || lastNameCol
+    ? `CONCAT_WS(' ', ${firstNameCol ? `p.\`${firstNameCol}\`` : "NULL"}, ${lastNameCol ? `p.\`${lastNameCol}\`` : "NULL"})`
+    : "NULL";
 
   const select = [
     patientIdCol ? `p.\`${patientIdCol}\` AS id` : "p.id AS id",
+<<<<<<< HEAD
     nameCol
       ? `p.\`${nameCol}\` AS name`
       : firstNameCol || lastNameCol
         ? `TRIM(CONCAT_WS(' ', ${firstNameCol ? `p.\`${firstNameCol}\`` : "''"}, ${lastNameCol ? `p.\`${lastNameCol}\`` : "''"})) AS name`
         : "NULL AS name",
+=======
+    externalPatientIdCol ? `p.\`${externalPatientIdCol}\` AS patient_id` : `p.\`${patientIdCol || "id"}\` AS patient_id`,
+    `${nameExpr} AS name`,
+    `${nameExpr} AS full_name`,
+>>>>>>> 7fdfd7e (committing the changes)
     phoneCol ? `p.\`${phoneCol}\` AS phone` : "NULL AS phone",
+    phoneCol ? `p.\`${phoneCol}\` AS mobile` : "NULL AS mobile",
     emailCol ? `p.\`${emailCol}\` AS email` : "NULL AS email",
     patientHospitalCol ? `p.\`${patientHospitalCol}\` AS hospital_id` : "NULL AS hospital_id",
   ];
@@ -59,7 +79,8 @@ async function list(hospitalId) {
   const params = [];
   if (hospitalId !== null && hospitalId !== undefined) {
     if (patientHospitalCol) {
-      whereParts.push(`p.\`${patientHospitalCol}\` = ?`);
+      // Legacy records can exist without a hospital mapping; include them for admin selection flows.
+      whereParts.push(`(p.\`${patientHospitalCol}\` = ? OR p.\`${patientHospitalCol}\` IS NULL)`);
       params.push(hospitalId);
     }
   }
@@ -67,7 +88,7 @@ async function list(hospitalId) {
   if (whereParts.length) {
     sql += ` WHERE ${whereParts.join(" AND ")}`;
   }
-  sql += ` ORDER BY p.created_at DESC, p.id DESC`;
+  sql += createdAtCol ? ` ORDER BY p.\`${createdAtCol}\` DESC, p.\`${patientIdCol || "id"}\` DESC` : ` ORDER BY p.\`${patientIdCol || "id"}\` DESC`;
 
   return query(sql, params);
 }
@@ -170,8 +191,23 @@ async function create(payload, hospitalId) {
 }
 
 async function getById(id) {
-  const rows = await query(`SELECT * FROM patients WHERE id = ?`, [id]);
-  return rows[0] || null;
+  const patientCols = await getTableColumns("patients");
+  if (!patientCols) return null;
+
+  const primaryIdCol = firstExistingColumn(patientCols, ["id"]);
+  const externalPatientIdCol = firstExistingColumn(patientCols, ["patient_id", "patient_id_no"]);
+
+  if (primaryIdCol) {
+    const rows = await query(`SELECT * FROM patients WHERE \`${primaryIdCol}\` = ? LIMIT 1`, [id]);
+    if (rows[0]) return rows[0];
+  }
+
+  if (externalPatientIdCol) {
+    const rows = await query(`SELECT * FROM patients WHERE \`${externalPatientIdCol}\` = ? LIMIT 1`, [id]);
+    if (rows[0]) return rows[0];
+  }
+
+  return null;
 }
 
 async function update(id, payload) {

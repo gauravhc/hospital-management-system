@@ -6,7 +6,7 @@ const morgan = require("morgan");
 const fs = require("fs");
 const path = require("path");
 
-const { testConnection } = require("./config/database");
+const { ensureDatabaseExists, getDatabaseName, testConnection } = require("./config/database");
 const { ensureErpSchema } = require("./services/bootstrap.service");
 const { notFoundMiddleware, errorMiddleware } = require("./middleware/errorMiddleware");
 const authMiddleware = require("./middleware/authMiddleware");
@@ -16,7 +16,11 @@ const apiRoutes = require("./routes");
 
 const app = express();
 
+<<<<<<< HEAD
 for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents"), path.join("uploads", "staff"), path.join("uploads", "hospitals"), path.join("uploads", "insurance")]) {
+=======
+for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents"), path.join("uploads", "claim_documents")]) {
+>>>>>>> 7fdfd7e (committing the changes)
   fs.mkdirSync(path.join(__dirname, dir), { recursive: true });
 }
 
@@ -77,6 +81,7 @@ app.use(errorMiddleware);
 const PORT = process.env.PORT || 5000;
 
 async function start() {
+  await ensureDatabaseExists();
   await testConnection();
   await ensureErpSchema();
   app.listen(PORT, () => {
@@ -85,6 +90,15 @@ async function start() {
 }
 
 start().catch((error) => {
+  if (error.code === "ER_BAD_DB_ERROR") {
+    console.error(
+      `Database "${getDatabaseName()}" is missing. Check backend/.env and rerun the backend.`
+    );
+  } else if (error.code === "ER_ACCESS_DENIED_ERROR") {
+    console.error(
+      `MySQL rejected the configured credentials. Check backend/.env DB_* values.`
+    );
+  }
   console.error("Failed to start backend", error);
   process.exit(1);
 });

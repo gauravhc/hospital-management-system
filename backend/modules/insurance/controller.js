@@ -1,12 +1,49 @@
 const service = require("./service");
 const { ok, getScopedHospitalId } = require("../../services/module.helper");
+const patientsService = require("../patients/service");
 
-async function claims(req, res) { return ok(res, await service.claims(getScopedHospitalId(req))); }
-async function createClaim(req, res) { await service.createClaim(req.body, getScopedHospitalId(req)); return ok(res, null, "Claim submitted", 201); }
+async function claims(req, res) {
+  const actorRole = String(req.user?.role || "").toLowerCase();
+  if (actorRole === "patient") {
+    return ok(res, await service.claimsByPatient(req.user.id, req.user?.hospital_id || null));
+  }
+  return ok(res, await service.claims(getScopedHospitalId(req)));
+}
+async function createClaim(req, res) {
+  const attachmentUrl = req.file?.filename ? `/uploads/claim_documents/${req.file.filename}` : null;
+  const actorRole = String(req.user?.role || "").toLowerCase();
+  const patientRow =
+    actorRole === "patient" && req.user?.id
+      ? await patientsService.getById(req.user.id)
+      : null;
+  const resolvedHospitalId =
+    req.user?.hospital_id ||
+    patientRow?.hospital_id ||
+    req.body?.hospital_id ||
+    null;
+  const payload =
+    actorRole === "patient"
+      ? {
+          ...req.body,
+          patient_id: req.user.id,
+          hospital_id: resolvedHospitalId,
+          attachment_url: attachmentUrl || req.body?.attachment_url || null,
+        }
+      : {
+          ...req.body,
+          attachment_url: attachmentUrl || req.body?.attachment_url || null,
+        };
+  await service.createClaim(payload, getScopedHospitalId(req, resolvedHospitalId));
+  return ok(res, null, "Claim submitted", 201);
+}
 async function updateClaim(req, res) { await service.updateClaim(req.params.id, req.body); return ok(res, null, "Claim updated"); }
 async function policies(req, res) { return ok(res, await service.policies(getScopedHospitalId(req))); }
 async function createPolicy(req, res) { await service.createPolicy(req.body, getScopedHospitalId(req)); return ok(res, null, "Policy created", 201); }
+async function patientInsuranceDetails(req, res) { return ok(res, await service.patientInsuranceDetails(getScopedHospitalId(req), req.params.patientId || null)); }
+async function createPatientInsuranceDetail(req, res) { await service.createPatientInsuranceDetail(req.body, getScopedHospitalId(req)); return ok(res, null, "Insurance detail saved", 201); }
+async function updatePatientInsuranceDetail(req, res) { await service.updatePatientInsuranceDetail(req.params.id, req.body); return ok(res, null, "Insurance detail updated"); }
 
+<<<<<<< HEAD
 function isPatient(req) {
   return String(req.user?.role || "").toLowerCase() === "patient";
 }
@@ -81,12 +118,20 @@ async function getPatientInsurance(req, res) {
   return res.json({ success: true, message: "Success", data: latest, history: rows });
 }
 
+=======
+>>>>>>> 7fdfd7e (committing the changes)
 module.exports = {
   claims,
   createClaim,
   updateClaim,
   policies,
   createPolicy,
+<<<<<<< HEAD
   createPatientInsurance,
   getPatientInsurance,
+=======
+  patientInsuranceDetails,
+  createPatientInsuranceDetail,
+  updatePatientInsuranceDetail,
+>>>>>>> 7fdfd7e (committing the changes)
 };

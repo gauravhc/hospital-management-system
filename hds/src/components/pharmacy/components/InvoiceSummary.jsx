@@ -1,9 +1,10 @@
 import formatCurrency from "@/utils/formatCurrency";
 
-export default function InvoiceSummary({ cart, onComplete }) {
-    const subtotal = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
-    const gstTotal = cart.reduce((s, i) => s + (i.qty * i.unitPrice * (i.gst || 0) / 100), 0);
-    const grandTotal = subtotal + gstTotal;
+export default function InvoiceSummary({ cart, totals, onComplete }) {
+    const subtotal = totals?.subtotal ?? cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+    const gstTotal = totals?.taxAmount ?? cart.reduce((s, i) => s + (i.qty * i.unitPrice * (i.gst || 0) / 100), 0);
+    const discountAmount = totals?.discountAmount ?? 0;
+    const grandTotal = totals?.totalAmount ?? subtotal + gstTotal - discountAmount;
 
     return (
         <div className="space-y-3">
@@ -11,6 +12,10 @@ export default function InvoiceSummary({ cart, onComplete }) {
             <div className="flex justify-between text-sm">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+                <span>Discount</span>
+                <span>- {formatCurrency(discountAmount)}</span>
             </div>
             <div className="flex justify-between text-sm">
                 <span>GST</span>
