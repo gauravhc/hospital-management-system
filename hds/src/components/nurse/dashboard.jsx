@@ -61,6 +61,7 @@ export default function NurseDashboard() {
   const [error, setError] = useState("");
 
   const [username, setUsername] = useState("Nurse");
+  const [nurseId, setNurseId] = useState("");
   const [avatar, setAvatar] = useState("");
   const [avatarFailed, setAvatarFailed] = useState(false);
 
@@ -83,6 +84,8 @@ export default function NurseDashboard() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
+    const userId = localStorage.getItem("id");
+    if (userId) setNurseId(String(userId));
     if (!token || role !== "nurse") {
       router.push("/login");
       return;
@@ -120,6 +123,8 @@ export default function NurseDashboard() {
     try {
       const res = await apiGet("/api/nurse/profile");
       const profile = res?.data || null;
+      const resolvedId = profile?.id || profile?.user_id || profile?.userId || localStorage.getItem("id") || "";
+      if (resolvedId) setNurseId(String(resolvedId));
       const name = profile?.full_name || profile?.name || profile?.email || "";
       setUsername(name || "Nurse");
       setAvatar(profile?.profile_image || profile?.profile_image_url || "");
@@ -299,6 +304,11 @@ export default function NurseDashboard() {
                 <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">
                   {greeting}, {profileLoading ? "..." : username}
                 </h2>
+                {nurseId ? (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                    Nurse ID: <span className="font-mono">{nurseId}</span>
+                  </p>
+                ) : null}
               </div>
             </div>
 

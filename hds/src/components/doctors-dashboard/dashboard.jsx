@@ -35,6 +35,7 @@ export default function DoctorPage() {
   const router = useRouter();
   // User State
   const [username, setUsername] = useState("Doctor");
+  const [doctorId, setDoctorId] = useState("");
   const [greeting, setGreeting] = useState("Welcome");
   const [isDark, setIsDark] = useState(false);
   const [avatar, setAvatar] = useState("");
@@ -100,6 +101,7 @@ export default function DoctorPage() {
     }
 
     setUsername(user || "");
+    setDoctorId(String(userId || "").trim());
     setAvatar(buildAvatarUrl(parsedUser?.profile_image_url || parsedUser?.profile_image || ""));
 
     // Greeting
@@ -292,6 +294,11 @@ export default function DoctorPage() {
               <h2 className="text-xl md:text-3xl font-extrabold text-slate-800 dark:text-white">
                 {greeting}, <span className="text-sky-600 dark:text-sky-400">Dr. {formatName(username)}</span>
               </h2>
+              {doctorId ? (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                  Doctor ID: <span className="font-mono">{doctorId}</span>
+                </p>
+              ) : null}
               <p className="text-sm text-slate-500 dark:text-slate-300">
                 Manage your schedule and patients
               </p>

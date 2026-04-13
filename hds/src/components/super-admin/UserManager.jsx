@@ -270,6 +270,7 @@ export default function SuperAdminUserManager() {
             <thead className="bg-slate-50">
               <tr className="text-left text-sm font-semibold text-slate-700">
                 <th className="px-6 py-4">Name</th>
+                <th className="px-6 py-4">ID</th>
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Hospital</th>
@@ -280,7 +281,7 @@ export default function SuperAdminUserManager() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-500">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="animate-spin" size={16} />
                       Loading users...
@@ -291,7 +292,7 @@ export default function SuperAdminUserManager() {
 
               {!loading && users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-6 py-10 text-center text-sm text-slate-500">
                     No users found.
                   </td>
                 </tr>
@@ -301,6 +302,9 @@ export default function SuperAdminUserManager() {
                 ? users.map((user) => (
                     <tr key={`${user.role}-${user.id}`} className="text-sm text-slate-700">
                       <td className="px-6 py-4 font-semibold text-slate-900">{user.name || "--"}</td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-700">
+                        {user?.employee_id || user?.patient_id_no || user?.id || "--"}
+                      </td>
                       <td className="px-6 py-4">{user.email || "--"}</td>
                       <td className="px-6 py-4">{formatRole(user.role)}</td>
                       <td className="px-6 py-4">

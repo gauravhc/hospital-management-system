@@ -50,6 +50,8 @@ async function listRoleUsers(table, roleLabel, scopedHospitalId, q) {
   if (!cols) return [];
 
   const idCol = firstExistingColumn(cols, ["id", "user_id", `${roleLabel}_id`]);
+  const employeeIdCol = firstExistingColumn(cols, ["employee_id", "emp_id", "staff_id"]);
+  const patientIdNoCol = firstExistingColumn(cols, ["patient_id_no", "patient_no"]);
   const nameCol = firstExistingColumn(cols, ["full_name", "name"]);
   const emailCol = firstExistingColumn(cols, ["email"]);
   const phoneCol = firstExistingColumn(cols, ["phone", "mobile"]);
@@ -63,6 +65,8 @@ async function listRoleUsers(table, roleLabel, scopedHospitalId, q) {
 
   const select = [
     `\`${idCol}\` AS id`,
+    employeeIdCol ? `\`${employeeIdCol}\` AS employee_id` : "NULL AS employee_id",
+    patientIdNoCol ? `\`${patientIdNoCol}\` AS patient_id_no` : "NULL AS patient_id_no",
     nameCol
       ? `\`${nameCol}\` AS name`
       : firstNameCol || lastNameCol

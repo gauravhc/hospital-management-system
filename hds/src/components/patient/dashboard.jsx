@@ -29,6 +29,7 @@ const cards = [
 export default function PatientDashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
+  const [patientId, setPatientId] = useState("");
   const [medicalHistory, setMedicalHistory] = useState(null);
   const [emergencyContact, setEmergencyContact] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -52,7 +53,11 @@ export default function PatientDashboardPage() {
           apiGet("/api/patients/appointments"),
         ]);
 
-        setProfile(profileRes?.success ? profileRes : null);
+        const profilePayload = profileRes?.data || profileRes?.user || profileRes;
+        setProfile(profileRes?.success ? profilePayload : null);
+        const storedId = typeof window !== "undefined" ? localStorage.getItem("id") : "";
+        const resolvedId = profilePayload?.patient_id || profilePayload?.id || storedId || "";
+        setPatientId(String(resolvedId || ""));
         setMedicalHistory(medicalRes?.success ? medicalRes : null);
         setEmergencyContact(emergencyRes?.success ? emergencyRes : null);
         const docs = Array.isArray(documentsRes?.documents)
@@ -142,7 +147,7 @@ export default function PatientDashboardPage() {
 
               <div>
                 <p className="text-xs text-slate-500">
-                  Patient ID: <span className="font-semibold text-sky-500">#{profile?.patient_id || "--"}</span>
+                  Patient ID: <span className="font-semibold text-sky-500">#{patientId || "--"}</span>
                 </p>
                 <h2 className="text-3xl font-extrabold text-slate-800">
                   {greeting}, <span className="text-sky-500">{displayName}</span>

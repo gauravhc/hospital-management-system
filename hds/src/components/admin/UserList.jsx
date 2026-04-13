@@ -276,6 +276,7 @@ export default function UserList() {
                         <thead className="bg-gray-50/50 border-b border-gray-100">
                             <tr>
                                 <th className="px-6 py-4 font-semibold text-gray-900">User</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">ID</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900">Role</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900">Department</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900">Status</th>
@@ -295,7 +296,7 @@ export default function UserList() {
                                 ))
                             ) : users.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-6 py-12 text-center text-gray-400">
+                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
                                         No users found matching your criteria.
                                     </td>
                                 </tr>
@@ -319,6 +320,11 @@ export default function UserList() {
                                                     <div className="font-semibold text-gray-900">{displayName}</div>
                                                     <div className="text-xs text-gray-500">{user.email}</div>
                                                 </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs font-mono text-gray-700">
+                                                {user?.employee_id || user?.patient_id_no || user?.id || "--"}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
