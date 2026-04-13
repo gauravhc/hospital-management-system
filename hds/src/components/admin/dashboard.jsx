@@ -750,6 +750,8 @@ export default function HRDashboard() {
                   <th className="py-2">Drop</th>
                   <th className="py-2">Type</th>
                   <th className="py-2">Phone</th>
+                  <th className="py-2">Status</th>
+                  <th className="py-2 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -760,6 +762,30 @@ export default function HRDashboard() {
                     <td className="py-3 text-slate-700">{r.drop_address || "--"}</td>
                     <td className="py-3 text-slate-700">{r.ambulance_type || "--"}</td>
                     <td className="py-3 text-slate-700">{r.contact_phone || r.patient_phone || "--"}</td>
+                    <td className="py-3">
+                      <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                        {r.status || "--"}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right">
+                      {String(r.status || "").toLowerCase() === "pending" ? (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/admin/ambulance?request_id=${encodeURIComponent(r.id)}&status=pending`)}
+                          className="rounded-xl px-4 py-2 text-xs font-extrabold text-white bg-[linear-gradient(90deg,#ff3b3b,#ff7a18)] hover:opacity-95"
+                        >
+                          Assign
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/admin/ambulance?request_id=${encodeURIComponent(r.id)}&status=${encodeURIComponent(String(r.status || \"pending\").toLowerCase())}`)}
+                          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800"
+                        >
+                          View
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

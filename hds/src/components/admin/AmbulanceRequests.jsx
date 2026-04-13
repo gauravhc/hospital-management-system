@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPost, apiPut } from "@/services/api";
 
 const toLower = (v) => String(v || "").toLowerCase();
@@ -24,12 +24,14 @@ const AMBULANCE_TYPE_OPTIONS = [
 
 export default function AmbulanceRequests() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [statusFilter, setStatusFilter] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [ambulances, setAmbulances] = useState([]);
   const [loading, setLoading] = useState(false);
   const [assigningId, setAssigningId] = useState(null);
   const [error, setError] = useState("");
+  const [focusedRequestId, setFocusedRequestId] = useState("");
 
   const [assignForm, setAssignForm] = useState({
     ambulance_id: "",
@@ -90,6 +92,19 @@ export default function AmbulanceRequests() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
+
+  useEffect(() => {
+    const requestId =
+      searchParams?.get("request_id") ||
+      searchParams?.get("requestId") ||
+      "";
+    const statusParam = (searchParams?.get("status") || "").trim().toLowerCase();
+
+    if (requestId) setFocusedRequestId(requestId);
+    if (statusParam) {
+      setStatusFilter((prev) => (prev === statusParam ? prev : statusParam));
+    }
+  }, [searchParams]);
 
   const createAmbulance = async () => {
     if (!newAmbulance.vehicle_no.trim()) {
@@ -252,7 +267,10 @@ export default function AmbulanceRequests() {
               </thead>
               <tbody>
                 {requests.map((r) => (
-                  <tr key={r.id} className="border-t border-slate-100">
+                  <tr
+                    key={r.id}
+                    className={`border-t border-slate-100 ${focusedRequestId && String(r.id) === String(focusedRequestId) ? "bg-amber-50" : ""}`}
+                  >
                     <td className="py-3 font-semibold text-slate-900">
                       {r.patient_name || r.patient_id || "--"}
                     </td>
