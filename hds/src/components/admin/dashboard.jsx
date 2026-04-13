@@ -779,7 +779,13 @@ export default function HRDashboard() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => router.push(`/admin/ambulance?request_id=${encodeURIComponent(r.id)}&status=${encodeURIComponent(String(r.status || \"pending\").toLowerCase())}`)}
+                          onClick={() =>
+                            router.push(
+                              `/admin/ambulance?request_id=${encodeURIComponent(r.id)}&status=${encodeURIComponent(
+                                String(r.status || "pending").toLowerCase()
+                              )}`
+                            )
+                          }
                           className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800"
                         >
                           View
