@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Truck } from "lucide-react";
-import { apiGet, apiPost } from "@/services/api";
+import { apiGet, apiPost, apiPut } from "@/services/api";
 
 const AMBULANCE_TYPES = ["Private", "108"];
 
@@ -31,6 +31,8 @@ const PatientAmbulancePage = () => {
 
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [patientNameInput, setPatientNameInput] = useState("");
+  const [patientAgeInput, setPatientAgeInput] = useState("");
 
   const [latestRequest, setLatestRequest] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -90,6 +92,49 @@ const PatientAmbulancePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const patientName = String(profile?.name || "").trim();
+    const derivedAge =
+      profile?.age !== undefined && profile?.age !== null && String(profile.age).trim() !== ""
+        ? String(profile.age)
+        : (() => {
+            const computed = computeAge(profile?.dob);
+            return computed === null ? "" : String(computed);
+          })();
+
+    setPatientNameInput((prev) => (prev ? prev : patientName));
+    setPatientAgeInput((prev) => (prev ? prev : derivedAge));
+  }, [profile]);
+
+  const persistProfileIfNeeded = async () => {
+    const name = String(patientNameInput || "").trim();
+    const ageRaw = String(patientAgeInput ?? "").trim();
+
+    const age =
+      ageRaw === ""
+        ? undefined
+        : (() => {
+            const parsed = Number(ageRaw);
+            if (!Number.isFinite(parsed)) return undefined;
+            return Math.max(0, Math.min(130, Math.trunc(parsed)));
+          })();
+
+    const currentName = String(profile?.name || "").trim();
+    const currentAge = profile?.age === null || profile?.age === undefined ? undefined : Number(profile?.age);
+
+    const shouldUpdateName = name && name !== currentName;
+    const shouldUpdateAge = age !== undefined && age !== currentAge;
+
+    if (!shouldUpdateName && !shouldUpdateAge) return;
+
+    await apiPut("/api/patients/profile", {
+      ...(shouldUpdateName ? { name } : {}),
+      ...(shouldUpdateAge ? { age } : {}),
+    });
+
+    await loadProfile();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -101,6 +146,12 @@ const PatientAmbulancePage = () => {
     try {
       setLoading(true);
       setError("");
+
+      try {
+        await persistProfileIfNeeded();
+      } catch {
+        // Profile update is best-effort; ambulance request should still work.
+      }
 
       await apiPost("/api/ambulance/request", {
         pickup_address: pickup,
@@ -123,9 +174,6 @@ const PatientAmbulancePage = () => {
       setLoading(false);
     }
   };
-
-  const patientName = String(profile?.name || "").trim();
-  const patientAge = computeAge(profile?.dob);
 
   return (
     <div className="bg-slate-50 min-h-screen flex flex-col">
@@ -161,17 +209,22 @@ const PatientAmbulancePage = () => {
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Patient Name</label>
                   <input
-                    value={profileLoading ? "Loading..." : patientName || "--"}
-                    readOnly
-                    className="p-3 border rounded-xl w-full bg-white text-slate-800"
+                    value={patientNameInput}
+                    onChange={(e) => setPatientNameInput(e.target.value)}
+                    className="p-3 border rounded-xl w-full bg-white text-slate-800 focus:ring-2 focus:ring-red-400 outline-none"
+                    placeholder={profileLoading ? "Loading..." : "Enter your name"}
                   />
                 </div>
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Age</label>
                   <input
-                    value={profileLoading ? "Loading..." : patientAge !== null ? String(patientAge) : "--"}
-                    readOnly
-                    className="p-3 border rounded-xl w-full bg-white text-slate-800"
+                    type="number"
+                    min={0}
+                    max={130}
+                    value={patientAgeInput}
+                    onChange={(e) => setPatientAgeInput(e.target.value)}
+                    className="p-3 border rounded-xl w-full bg-white text-slate-800 focus:ring-2 focus:ring-red-400 outline-none"
+                    placeholder={profileLoading ? "Loading..." : "Enter your age"}
                   />
                 </div>
               </div>

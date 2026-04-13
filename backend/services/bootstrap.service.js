@@ -816,6 +816,18 @@ async function ensurePatientInsuranceTable() {
   }
 }
 
+async function ensurePatientAgeColumn() {
+  try {
+    const cols = await getTableColumns("patients");
+    if (!cols || cols.has("age")) return;
+
+    await query("ALTER TABLE patients ADD COLUMN age INT NULL");
+    clearTableColumnsCache("patients");
+  } catch (err) {
+    console.warn("ensurePatientAgeColumn skipped:", err?.message || err);
+  }
+}
+
 async function ensureErpSchema() {
   const mode = await getSchemaMode();
 
@@ -862,6 +874,7 @@ async function ensureErpSchema() {
     await ensureStructuredMedicalHistory();
     await ensurePatientInsuranceTable();
     await ensureLabTestExtensions();
+    await ensurePatientAgeColumn();
     return;
   }
 
@@ -895,6 +908,9 @@ async function ensureErpSchema() {
 
   // Patient insurance identity & policy uploads.
   await ensurePatientInsuranceTable();
+
+  // Allow patient portal to save explicit age when DOB is missing/unknown.
+  await ensurePatientAgeColumn();
 
   const defaultRoles = [
     ["super_admin", "Super Administrator", JSON.stringify(["*"])],
