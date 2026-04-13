@@ -152,18 +152,32 @@ async function hospitalRequests(user, { status } = {}) {
   const hospitalId = user?.hospital_id || null;
   if (!hospitalId) return [];
 
+  const ACTIVE_STATUSES = ["pending", "assigned", "enroute", "arrived"];
+  const parseStatuses = (value) => {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return [];
+    if (raw === "active") return ACTIVE_STATUSES;
+    if (raw === "all") return [];
+    return raw
+      .split(",")
+      .map((s) => normalizeStatus(s))
+      .filter(Boolean);
+  };
+
+  const statuses = parseStatuses(status);
+
   const params = [hospitalId];
-  let where = "WHERE ar.hospital_id = ?";
-  if (status) {
-    where += " AND LOWER(ar.status) = ?";
-    params.push(String(status).toLowerCase());
+  const whereParts = ["ar.hospital_id = ?"];
+  if (statuses.length) {
+    whereParts.push(`LOWER(REPLACE(ar.status, '_', '')) IN (${statuses.map(() => "?").join(", ")})`);
+    params.push(...statuses);
   }
 
   return query(
     `SELECT ar.*, p.full_name AS patient_name
      FROM ambulance_requests ar
      JOIN patients p ON p.id = ar.patient_id
-     ${where}
+     WHERE ${whereParts.join(" AND ")}
      ORDER BY ar.created_at DESC, ar.id DESC`,
     params
   );
@@ -225,11 +239,12 @@ async function assignAmbulance(user, { request_id, ambulance_id, eta_minutes = n
   return rows[0] || null;
 }
 
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase().replace(/_/g, "");
+
 const STATUS_FLOW = {
   pending: ["assigned"],
-  assigned: ["enroute", "en_route"],
+  assigned: ["enroute"],
   enroute: ["arrived", "completed"],
-  en_route: ["arrived", "completed"],
   arrived: ["completed"],
   completed: [],
 };
@@ -249,8 +264,13 @@ async function updateRequestStatus(user, { request_id, status } = {}) {
   }
 
   const request = rows[0];
-  const current = String(request.status || "pending").toLowerCase();
-  const next = String(status || "").toLowerCase();
+  const current = normalizeStatus(request.status || "pending");
+  const next = normalizeStatus(status || "");
+
+  // Idempotent updates: if status is already set (or equivalent like en_route/enroute), treat as success.
+  if (current && next && current === next) {
+    return request;
+  }
 
   if (!STATUS_FLOW[current] || !STATUS_FLOW[current].includes(next)) {
     const err = new Error(`Invalid status transition: ${current} -> ${next}`);

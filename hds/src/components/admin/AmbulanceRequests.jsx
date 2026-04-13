@@ -179,8 +179,11 @@ export default function AmbulanceRequests() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
             >
+              <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="assigned">Assigned</option>
+              <option value="enroute">En Route</option>
+              <option value="arrived">Arrived</option>
               <option value="completed">Completed</option>
             </select>
             <button
@@ -315,20 +318,55 @@ export default function AmbulanceRequests() {
                         </div>
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateStatus(r.id, "enroute")}
-                            className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-sky-700"
-                          >
-                            Start Trip
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateStatus(r.id, "completed")}
-                            className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
-                          >
-                            Complete
-                          </button>
+                          {(() => {
+                            const status = toLower(r.status);
+                            if (status === "assigned") {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => updateStatus(r.id, "enroute")}
+                                  className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-sky-700"
+                                >
+                                  Start Trip
+                                </button>
+                              );
+                            }
+
+                            if (status === "enroute" || status === "en_route") {
+                              return (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateStatus(r.id, "arrived")}
+                                    className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-indigo-700"
+                                  >
+                                    Mark Arrived
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateStatus(r.id, "completed")}
+                                    className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+                                  >
+                                    Complete
+                                  </button>
+                                </>
+                              );
+                            }
+
+                            if (status === "arrived") {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => updateStatus(r.id, "completed")}
+                                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+                                >
+                                  Complete
+                                </button>
+                              );
+                            }
+
+                            return null;
+                          })()}
                         </div>
                       )}
                     </td>
