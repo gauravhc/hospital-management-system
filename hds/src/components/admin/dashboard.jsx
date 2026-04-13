@@ -218,7 +218,7 @@ export default function HRDashboard() {
 
       const [statsRes, ambulanceRes] = await Promise.all([
         apiGet("/api/admin/dashboard-stats"),
-        apiGet("/api/admin/ambulance/requests", { status: "pending", limit: 5 }),
+        apiGet("/api/admin/ambulance/requests", { status: "active", limit: 5 }),
       ]);
 
       const payload = statsRes?.data || statsRes || {};
@@ -257,12 +257,12 @@ export default function HRDashboard() {
         },
       });
 
-      const pendingList = Array.isArray(ambulanceRes?.data)
+      const activeList = Array.isArray(ambulanceRes?.data)
         ? ambulanceRes.data
         : Array.isArray(ambulanceRes?.requests)
         ? ambulanceRes.requests
         : [];
-      setPendingAmbulanceRequests(pendingList);
+      setPendingAmbulanceRequests(activeList);
     } catch (err) {
       console.error("Dashboard error", err);
     }
@@ -724,9 +724,9 @@ export default function HRDashboard() {
       <div className="mt-8 rounded-3xl border border-white/20 bg-white/95 p-6 shadow-xl">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h4 className="text-lg font-extrabold text-slate-900">Pending Ambulance Requests</h4>
+            <h4 className="text-lg font-extrabold text-slate-900">Active Ambulance Requests</h4>
             <p className="text-sm text-slate-500">
-              {pendingAmbulanceRequests.length} pending request(s)
+              {pendingAmbulanceRequests.length} active request(s)
             </p>
           </div>
           <button
@@ -739,7 +739,7 @@ export default function HRDashboard() {
         </div>
 
         {pendingAmbulanceRequests.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">No pending requests.</p>
+          <p className="mt-4 text-sm text-slate-500">No active requests.</p>
         ) : (
           <div className="mt-4 overflow-auto">
             <table className="min-w-[900px] w-full text-sm">

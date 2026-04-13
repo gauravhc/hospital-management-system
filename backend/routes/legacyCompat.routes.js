@@ -1595,8 +1595,19 @@ router.get("/admin/ambulance/requests", authMiddleware, roleMiddleware("hospital
       return res.status(400).json({ success: false, message: "Hospital not found for current user" });
     }
 
-    const status = String(req.query.status || "pending").trim().toLowerCase();
+    const statusParam = String(req.query.status || "pending").trim().toLowerCase();
     const limit = Math.min(Math.max(Number(req.query.limit || 50), 1), 200);
+
+    const ACTIVE_STATUSES = ["pending", "assigned", "enroute", "arrived"];
+    const parseStatuses = (value) => {
+      const raw = String(value || "").trim().toLowerCase();
+      if (!raw) return ["pending"];
+      if (raw === "active") return ACTIVE_STATUSES;
+      if (raw === "all") return [];
+      const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      return parts.length ? parts : [raw];
+    };
+    const statuses = parseStatuses(statusParam);
 
     const patientCols = await getTableColumns("patients");
     const patientIdCol = firstExistingColumn(patientCols, ["id", "patient_id", "user_id"]);
@@ -1609,14 +1620,22 @@ router.get("/admin/ambulance/requests", authMiddleware, roleMiddleware("hospital
       patientPhoneCol ? `p.\`${patientPhoneCol}\` AS patient_phone` : "NULL AS patient_phone",
     ];
 
+    const where = ["ar.hospital_id = ?"];
+    const params = [scopedHospitalId];
+
+    if (statuses.length) {
+      where.push(`LOWER(ar.status) IN (${statuses.map(() => "?").join(", ")})`);
+      params.push(...statuses);
+    }
+
     const rows = await query(
       `SELECT ${select.join(", ")}
        FROM ambulance_requests ar
        LEFT JOIN patients p ON ${patientIdCol ? `p.\`${patientIdCol}\`` : "p.id"} = ar.patient_id
-       WHERE ar.hospital_id = ? AND LOWER(ar.status) = ?
+       WHERE ${where.join(" AND ")}
        ORDER BY ar.created_at DESC, ar.id DESC
        LIMIT ${limit}`,
-      [scopedHospitalId, status]
+      params
     );
 
     res.json({ success: true, data: rows, requests: rows });
