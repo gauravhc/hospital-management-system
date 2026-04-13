@@ -1,6 +1,39 @@
 const { query } = require("../../config/database");
 const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
 
+function normalizeStatus(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "");
+}
+
+function normalizeTests(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v || "").trim()).filter(Boolean);
+  }
+
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((v) => String(v || "").trim()).filter(Boolean);
+    }
+  } catch {
+    // ignore
+  }
+
+  // Legacy fallbacks: comma/newline separated strings like "ECG, Blood Test"
+  return raw
+    .split(/[\n,]+/g)
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+}
+
 async function pickDefaultAssigneeId(hospitalId) {
   if (!hospitalId) return null;
   const cols = await getTableColumns("nurses");
@@ -44,29 +77,25 @@ async function assignTask({ hospitalId, assignedBy, nurseId, patientId, taskTitl
   const cols = await getTableColumns("nurse_tasks");
   if (!cols) throw new Error("nurse_tasks table not found");
 
-  const safeTests = Array.isArray(tests) ? tests.map((t) => String(t || "").trim()).filter(Boolean) : [];
-  const testsPayload = safeTests.length ? JSON.stringify(safeTests) : null;
+  const safeTests = normalizeTests(tests);
+  const testsPayload = JSON.stringify(safeTests);
 
   const normalizedTreatment = String(treatment || "").trim();
   const normalizedDescription = String(description || "").trim();
-  const combinedDescription = (() => {
-    if (!normalizedTreatment && !testsPayload) return normalizedDescription || null;
-    const lines = [];
-    if (normalizedTreatment) lines.push(`Treatment: ${normalizedTreatment}`);
-    if (safeTests.length) lines.push(`Tests: ${safeTests.join(", ")}`);
-    if (normalizedDescription) lines.push(`Notes: ${normalizedDescription}`);
-    return lines.join("\n");
-  })();
 
   const record = {
     hospital_id: hospitalId ?? null,
+    // nurse assignment is optional; nurses can accept later.
     nurse_id: nurseId ?? null,
+    assigned_nurse_id: nurseId ?? null,
     patient_id: patientId,
     task_title: taskTitle,
     title: taskTitle,
     treatment: normalizedTreatment || null,
+    // Always store structured JSON string.
     tests: testsPayload,
-    description: combinedDescription,
+    // Keep notes separate: do NOT mix treatment/tests into description.
+    description: normalizedDescription || null,
     priority: priority || "medium",
     assigned_by: assignedBy ?? null,
     status: "pending",
@@ -85,6 +114,163 @@ async function assignTask({ hospitalId, assignedBy, nurseId, patientId, taskTitl
   );
 
   return { id: result?.insertId || null };
+}
+
+async function getTaskById(taskId, hospitalId) {
+  const cols = await getTableColumns("nurse_tasks");
+  if (!cols) throw new Error("nurse_tasks table not found");
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  if (!idCol) throw new Error("nurse_tasks schema missing id");
+
+  const where = [`\`${idCol}\` = ?`];
+  const params = [taskId];
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  const rows = await query(`SELECT * FROM nurse_tasks WHERE ${where.join(" AND ")} LIMIT 1`, params);
+  return rows[0] || null;
+}
+
+async function acceptTask({ taskId, hospitalId, nurseId }) {
+  const cols = await getTableColumns("nurse_tasks");
+  if (!cols) throw new Error("nurse_tasks table not found");
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  const nurseCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+
+  if (!idCol || !statusCol || !nurseCol) throw new Error("nurse_tasks schema missing required columns");
+
+  const where = [`\`${idCol}\` = ?`];
+  const params = [taskId];
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  const task = await getTaskById(taskId, hospitalId);
+  if (!task) {
+    const err = new Error("Task not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const current = normalizeStatus(task[statusCol] || "pending");
+  const existingNurseId = task[nurseCol];
+
+  if (current !== "pending") {
+    const err = new Error(`Only pending tasks can be accepted (current: ${current || "unknown"})`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (existingNurseId && String(existingNurseId) !== String(nurseId)) {
+    const err = new Error("Task already assigned to another nurse");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  await query(
+    `UPDATE nurse_tasks SET \`${nurseCol}\` = ?, \`${statusCol}\` = 'accepted' WHERE ${where.join(" AND ")}`,
+    [nurseId, ...params]
+  );
+
+  return getTaskById(taskId, hospitalId);
+}
+
+async function startTask({ taskId, hospitalId, nurseId }) {
+  const cols = await getTableColumns("nurse_tasks");
+  if (!cols) throw new Error("nurse_tasks table not found");
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  const nurseCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+
+  if (!idCol || !statusCol || !nurseCol) throw new Error("nurse_tasks schema missing required columns");
+
+  const where = [`\`${idCol}\` = ?`];
+  const params = [taskId];
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  const task = await getTaskById(taskId, hospitalId);
+  if (!task) {
+    const err = new Error("Task not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const current = normalizeStatus(task[statusCol] || "pending");
+  if (current !== "accepted") {
+    const err = new Error(`Invalid status transition: ${current} -> in_progress`);
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!task[nurseCol] || String(task[nurseCol]) !== String(nurseId)) {
+    const err = new Error("Only the assigned nurse can start this task");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  await query(
+    `UPDATE nurse_tasks SET \`${statusCol}\` = 'in_progress' WHERE ${where.join(" AND ")}`,
+    params
+  );
+
+  return getTaskById(taskId, hospitalId);
+}
+
+async function completeTask({ taskId, hospitalId, nurseId }) {
+  const cols = await getTableColumns("nurse_tasks");
+  if (!cols) throw new Error("nurse_tasks table not found");
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  const nurseCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+
+  if (!idCol || !statusCol || !nurseCol) throw new Error("nurse_tasks schema missing required columns");
+
+  const where = [`\`${idCol}\` = ?`];
+  const params = [taskId];
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  const task = await getTaskById(taskId, hospitalId);
+  if (!task) {
+    const err = new Error("Task not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const current = normalizeStatus(task[statusCol] || "pending");
+  if (current !== "inprogress") {
+    const err = new Error(`Invalid status transition: ${current} -> completed`);
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!task[nurseCol] || String(task[nurseCol]) !== String(nurseId)) {
+    const err = new Error("Only the assigned nurse can complete this task");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  await query(
+    `UPDATE nurse_tasks SET \`${statusCol}\` = 'completed' WHERE ${where.join(" AND ")}`,
+    params
+  );
+
+  return getTaskById(taskId, hospitalId);
 }
 
 async function listPlansByPatient({ hospitalId, patientId, assignedBy = null } = {}) {
@@ -141,28 +327,19 @@ async function listPlansByPatient({ hospitalId, patientId, assignedBy = null } =
     params
   );
 
-  return rows.map((row) => {
-    let parsedTests = [];
-    try {
-      if (row?.tests) {
-        const raw = String(row.tests);
-        const asJson = JSON.parse(raw);
-        if (Array.isArray(asJson)) parsedTests = asJson.map(String).filter(Boolean);
-      }
-    } catch {
-      // ignore
-    }
-
-    return {
-      ...row,
-      tests: parsedTests.length ? parsedTests : row?.tests || null,
-    };
-  });
+  return rows.map((row) => ({
+    ...row,
+    tests: normalizeTests(row?.tests),
+  }));
 }
 
 module.exports = {
   pickDefaultAssigneeId,
   resolveHospitalIdForRow,
   assignTask,
+  normalizeTests,
+  acceptTask,
+  startTask,
+  completeTask,
   listPlansByPatient,
 };

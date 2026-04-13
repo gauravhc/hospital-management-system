@@ -30,6 +30,13 @@ const statusPill = (status) => {
       </span>
     );
   }
+  if (s === "accepted") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+        <CheckCircle size={12} className="mr-1" /> Accepted
+      </span>
+    );
+  }
   if (s === "in_progress") {
     return (
       <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
@@ -179,9 +186,12 @@ export default function NurseDashboard() {
     const q = String(search || "").trim().toLowerCase();
     if (!q) return tasks;
     return (tasks || []).filter((t) => {
+      const testsLabel = Array.isArray(t?.tests) ? t.tests.join(" ") : String(t?.tests || "");
       const hay = [
         t.task_title,
         t.title,
+        t.treatment,
+        testsLabel,
         t.description,
         t.patient_name,
         t.patient_id,
@@ -199,6 +209,7 @@ export default function NurseDashboard() {
 
   const totalTasks = tasks.length;
   const pendingCount = tasks.filter((t) => statusOf(t.status) === "pending").length;
+  const acceptedCount = tasks.filter((t) => statusOf(t.status) === "accepted").length;
   const inProgressCount = tasks.filter((t) => statusOf(t.status) === "in_progress").length;
   const completedCount = tasks.filter((t) => statusOf(t.status) === "completed").length;
 
@@ -228,24 +239,23 @@ export default function NurseDashboard() {
     loadVitals(task?.patient_id);
   };
 
-  const updateTaskStatus = async (task, nextStatus) => {
+  const updateTaskStatus = async (task, action) => {
     const id = task?.id;
     if (!id) return;
 
-    const previous = task.status;
-    setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, status: nextStatus } : t)));
-    if (selectedTask && String(selectedTask.id) === String(id)) {
-      setSelectedTask((s) => (s ? { ...s, status: nextStatus } : s));
-    }
-
     try {
-      await apiPut(`/api/nurse/tasks/${id}`, { status: nextStatus });
-      showToast("success", "Task updated");
-    } catch (e) {
-      setTasks((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, status: previous } : t)));
-      if (selectedTask && String(selectedTask.id) === String(id)) {
-        setSelectedTask((s) => (s ? { ...s, status: previous } : s));
+      if (action === "accept") {
+        await apiPut(`/api/tasks/${id}/accept`);
+        showToast("success", "Task accepted");
+      } else if (action === "start") {
+        await apiPut(`/api/tasks/${id}/start`);
+        showToast("success", "Task started");
+      } else if (action === "complete") {
+        await apiPut(`/api/tasks/${id}/complete`);
+        showToast("success", "Task completed");
       }
+      await loadTasks();
+    } catch (e) {
       showToast("error", e?.message || "Failed to update task");
     }
   };
@@ -399,7 +409,7 @@ export default function NurseDashboard() {
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                     <ClipboardList className="text-sky-500" size={20} />
-                    Assigned Tasks
+                    Tasks
                   </h3>
                   <button
                     type="button"
@@ -453,19 +463,31 @@ export default function NurseDashboard() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  updateTaskStatus(task, "in_progress");
+                                  updateTaskStatus(task, "accept");
+                                }}
+                                className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-sky-700"
+                              >
+                                Accept
+                              </button>
+                            ) : null}
+                            {statusOf(task.status) === "accepted" ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateTaskStatus(task, "start");
                                 }}
                                 className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-sky-700"
                               >
                                 Start
                               </button>
                             ) : null}
-                            {statusOf(task.status) !== "completed" ? (
+                            {statusOf(task.status) === "in_progress" ? (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  updateTaskStatus(task, "completed");
+                                  updateTaskStatus(task, "complete");
                                 }}
                                 className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-emerald-700"
                               >
@@ -516,12 +538,36 @@ export default function NurseDashboard() {
                         </div>
                       </div>
 
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/50">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                          Treatment
+                        </p>
+                        <p className="text-sm text-slate-900 dark:text-slate-100 leading-relaxed whitespace-pre-wrap">
+                          {selectedTask.treatment || "--"}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/50">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                          Tests
+                        </p>
+                        {Array.isArray(selectedTask.tests) && selectedTask.tests.length ? (
+                          <ul className="mt-1 list-disc list-inside text-sm text-slate-800 dark:text-slate-100 space-y-1">
+                            {selectedTask.tests.map((t) => (
+                              <li key={t}>{t}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm text-slate-700 dark:text-slate-100">--</p>
+                        )}
+                      </div>
+
                       <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/30">
                         <p className="text-xs font-semibold text-rose-800 dark:text-rose-300 uppercase mb-1">
-                          Description
+                          Notes
                         </p>
-                        <p className="text-sm text-rose-900 dark:text-rose-100 leading-relaxed">
-                          {selectedTask.description || "No description provided."}
+                        <p className="text-sm text-rose-900 dark:text-rose-100 leading-relaxed whitespace-pre-wrap">
+                          {selectedTask.description || "--"}
                         </p>
                       </div>
                     </div>

@@ -59,10 +59,12 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
 
   const taskIdCol = firstExistingColumn(taskCols, ["id", "task_id"]);
   const taskHospitalCol = firstExistingColumn(taskCols, ["hospital_id"]);
-  const taskNurseCol = firstExistingColumn(taskCols, ["nurse_id"]);
+  const taskNurseCol = firstExistingColumn(taskCols, ["assigned_nurse_id", "nurse_id"]);
   const taskPatientCol = firstExistingColumn(taskCols, ["patient_id"]);
   const titleCol = firstExistingColumn(taskCols, ["task_title", "title"]);
   const descriptionCol = firstExistingColumn(taskCols, ["description"]);
+  const treatmentCol = firstExistingColumn(taskCols, ["treatment"]);
+  const testsCol = firstExistingColumn(taskCols, ["tests"]);
   const statusCol = firstExistingColumn(taskCols, ["status"]);
   const priorityCol = firstExistingColumn(taskCols, ["priority"]);
   const assignedByCol = firstExistingColumn(taskCols, ["assigned_by"]);
@@ -90,6 +92,8 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
     `t.\`${taskNurseCol}\` AS nurse_id`,
     taskPatientCol ? `t.\`${taskPatientCol}\` AS patient_id` : "NULL AS patient_id",
     titleCol ? `t.\`${titleCol}\` AS task_title` : "NULL AS task_title",
+    treatmentCol ? `t.\`${treatmentCol}\` AS treatment` : "NULL AS treatment",
+    testsCol ? `t.\`${testsCol}\` AS tests` : "NULL AS tests",
     descriptionCol ? `t.\`${descriptionCol}\` AS description` : "NULL AS description",
     statusCol ? `t.\`${statusCol}\` AS status` : "'pending' AS status",
     priorityCol ? `t.\`${priorityCol}\` AS priority` : "'medium' AS priority",
@@ -107,12 +111,19 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
     select.push("NULL AS patient_phone");
   }
 
-  const where = [`t.\`${taskNurseCol}\` = ?`];
-  const params = [nurseId];
+  const where = [];
+  const params = [];
+
   if (taskHospitalCol && hospitalId) {
     where.push(`t.\`${taskHospitalCol}\` = ?`);
     params.push(hospitalId);
   }
+
+  // Nurses should see:
+  // - unassigned tasks for their hospital (pending)
+  // - tasks accepted/started by themselves
+  where.push(`(t.\`${taskNurseCol}\` IS NULL OR t.\`${taskNurseCol}\` = ?)`);
+  params.push(nurseId);
 
   const sql = `SELECT ${select.join(", ")}
     FROM nurse_tasks t
@@ -126,7 +137,29 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
 async function listTasks({ nurseId, hospitalId }) {
   const built = await buildTasksQuery({ nurseId, hospitalId });
   if (!built) return [];
-  return query(built.sql, built.params);
+  const rows = await query(built.sql, built.params);
+
+  const normalizeTests = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(String).filter(Boolean);
+    const raw = String(value || "").trim();
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((v) => String(v || "").trim()).filter(Boolean);
+    } catch {
+      // ignore
+    }
+    return raw
+      .split(/[\n,]+/g)
+      .map((v) => String(v || "").trim())
+      .filter(Boolean);
+  };
+
+  return rows.map((row) => ({
+    ...row,
+    tests: normalizeTests(row?.tests),
+  }));
 }
 
 async function updateTaskStatus({ taskId, nurseId, hospitalId, status }) {
@@ -234,4 +267,3 @@ module.exports = {
   addVitals,
   listVitals,
 };
-

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPost } from "@/services/api";
+import { LAB_TESTS_FLAT } from "@/data/labTests";
 
 export default function DoctorAssignTaskPage() {
   const router = useRouter();
@@ -12,7 +13,6 @@ export default function DoctorAssignTaskPage() {
   const [toast, setToast] = useState(null);
   const [error, setError] = useState("");
 
-  const [assignees, setAssignees] = useState([]);
   const [patients, setPatients] = useState([]);
 
   const [form, setForm] = useState({
@@ -40,16 +40,10 @@ export default function DoctorAssignTaskPage() {
       setLoading(true);
       setError("");
       try {
-        const [assigneeRes, patientRes] = await Promise.all([
-          apiGet("/api/hospital/nurses"),
-          apiGet("/api/hospital/patients"),
-        ]);
-
-        setAssignees(Array.isArray(assigneeRes?.data) ? assigneeRes.data : []);
+        const patientRes = await apiGet("/api/hospital/patients");
         setPatients(Array.isArray(patientRes?.data) ? patientRes.data : []);
       } catch (e) {
         setError(e?.message || "Failed to load data.");
-        setAssignees([]);
         setPatients([]);
       } finally {
         setLoading(false);
@@ -58,11 +52,6 @@ export default function DoctorAssignTaskPage() {
 
     load();
   }, [router]);
-
-  const defaultAssigneeId = useMemo(() => {
-    const first = Array.isArray(assignees) ? assignees[0] : null;
-    return first?.id || first?.nurse_id || first?.user_id || "";
-  }, [assignees]);
 
   const patientOptions = useMemo(
     () =>
@@ -83,22 +72,7 @@ export default function DoctorAssignTaskPage() {
     setForm((prev) => ({ ...prev, tests: selected }));
   };
 
-  const TEST_OPTIONS = [
-    "CBC",
-    "CRP",
-    "ESR",
-    "Blood Sugar (FBS)",
-    "Blood Sugar (PPBS)",
-    "HbA1c",
-    "LFT",
-    "RFT",
-    "Lipid Profile",
-    "TSH",
-    "Urine Routine",
-    "ECG",
-    "X-Ray",
-    "Ultrasound",
-  ];
+  const TEST_OPTIONS = useMemo(() => LAB_TESTS_FLAT.map((t) => t.name), []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -112,22 +86,8 @@ export default function DoctorAssignTaskPage() {
 
     setSubmitting(true);
     try {
-      if (!defaultAssigneeId) {
-        setToast({ type: "error", message: "No staff available for this hospital." });
-        return;
-      }
-
-      const selectedTests = Array.isArray(form.tests) ? form.tests : [];
-      const descriptionLines = [
-        `Treatment: ${form.treatment.trim()}`,
-        selectedTests.length ? `Tests: ${selectedTests.join(", ")}` : null,
-      ].filter(Boolean);
-
-      await apiPost("/api/tasks/assign", {
-        nurse_id: defaultAssigneeId,
+      await apiPost("/api/tasks", {
         patient_id: form.patient_id,
-        task_title: "Treatment & Tests",
-        description: descriptionLines.join("\n"),
         treatment: form.treatment.trim(),
         tests: form.tests,
         priority: form.priority,

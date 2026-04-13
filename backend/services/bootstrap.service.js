@@ -659,6 +659,17 @@ async function ensureNurseModuleTables() {
     await addColumnIfMissing("assigned_by", "`assigned_by` VARCHAR(36) NULL");
     await addColumnIfMissing("created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
   }
+
+  // Allow "accepted" status for the nurse task workflow (pending -> accepted -> in_progress -> completed).
+  try {
+    // Best-effort enum upgrade; if status is already compatible, this will be a no-op.
+    await query(
+      "ALTER TABLE nurse_tasks MODIFY COLUMN status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending'"
+    );
+    clearTableColumnsCache("nurse_tasks");
+  } catch (err) {
+    // Some schemas may not use ENUM or may restrict ALTER; ignore to avoid boot failures.
+  }
 }
 
 async function ensureNotificationsTable() {
