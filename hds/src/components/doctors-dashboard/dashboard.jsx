@@ -36,6 +36,7 @@ export default function DoctorPage() {
   // User State
   const [username, setUsername] = useState("Doctor");
   const [doctorId, setDoctorId] = useState("");
+  const [hospitalLabel, setHospitalLabel] = useState("");
   const [greeting, setGreeting] = useState("Welcome");
   const [isDark, setIsDark] = useState(false);
   const [avatar, setAvatar] = useState("");
@@ -94,6 +95,12 @@ export default function DoctorPage() {
     const role = localStorage.getItem("role") || parsedUser?.role;
     const user = parsedUser?.name || localStorage.getItem("username") || parsedUser?.username || parsedUser?.email;
     const userId = localStorage.getItem("id") || parsedUser?.id;
+    const initialHospitalId =
+      parsedUser?.hospital_id ||
+      parsedUser?.hospitalId ||
+      parsedUser?.hospital?.id ||
+      localStorage.getItem("hospital_id") ||
+      "";
 
     if (!token || role !== "doctor") {
       router.push("/login");
@@ -116,6 +123,27 @@ export default function DoctorPage() {
     // Fetch Data
     fetchAppointments(userId);
 
+    const loadHospital = async (hospitalId) => {
+      const hid = String(hospitalId || "").trim();
+      if (!hid) return;
+      try {
+        const res = await apiGet("/api/hospitals/list");
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.hospitals)
+          ? res.hospitals
+          : [];
+        const match = list.find((h) => String(h?.id) === hid);
+        if (!match) return;
+        const label = `${match.name || ""}${match.address ? ` - ${match.address}` : ""}`.trim();
+        if (label) setHospitalLabel(label);
+      } catch {
+        // ignore
+      }
+    };
+
+    loadHospital(initialHospitalId);
+
     // Best-effort: refresh profile details for name/avatar if available.
     (async () => {
       try {
@@ -125,6 +153,9 @@ export default function DoctorPage() {
         if (displayName) setUsername(displayName);
         const nextAvatar = buildAvatarUrl(profile?.profile_image_url || profile?.profile_image || "");
         if (nextAvatar) setAvatar(nextAvatar);
+
+        const profileHospitalId = profile?.hospital_id || profile?.hospitalId || profile?.hospital?.id || "";
+        if (profileHospitalId) loadHospital(profileHospitalId);
       } catch (err) {
         // ignore
       }
@@ -297,6 +328,11 @@ export default function DoctorPage() {
               {doctorId ? (
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
                   Doctor ID: <span className="font-mono">{doctorId}</span>
+                </p>
+              ) : null}
+              {hospitalLabel ? (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                  Hospital: <span className="font-semibold">{hospitalLabel}</span>
                 </p>
               ) : null}
               <p className="text-sm text-slate-500 dark:text-slate-300">

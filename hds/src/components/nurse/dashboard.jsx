@@ -62,6 +62,7 @@ export default function NurseDashboard() {
 
   const [username, setUsername] = useState("Nurse");
   const [nurseId, setNurseId] = useState("");
+  const [hospitalLabel, setHospitalLabel] = useState("");
   const [avatar, setAvatar] = useState("");
   const [avatarFailed, setAvatarFailed] = useState(false);
 
@@ -125,6 +126,26 @@ export default function NurseDashboard() {
       const profile = res?.data || null;
       const resolvedId = profile?.id || profile?.user_id || profile?.userId || localStorage.getItem("id") || "";
       if (resolvedId) setNurseId(String(resolvedId));
+
+      const hospitalId = profile?.hospital_id || profile?.hospitalId || profile?.hospital?.id || localStorage.getItem("hospital_id") || "";
+      if (hospitalId) {
+        try {
+          const hospitalRes = await apiGet("/api/hospitals/list");
+          const list = Array.isArray(hospitalRes?.data)
+            ? hospitalRes.data
+            : Array.isArray(hospitalRes?.hospitals)
+            ? hospitalRes.hospitals
+            : [];
+          const match = list.find((h) => String(h?.id) === String(hospitalId));
+          if (match?.name) {
+            const label = `${match.name}${match.address ? ` - ${match.address}` : ""}`.trim();
+            if (label) setHospitalLabel(label);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       const name = profile?.full_name || profile?.name || profile?.email || "";
       setUsername(name || "Nurse");
       setAvatar(profile?.profile_image || profile?.profile_image_url || "");
@@ -307,6 +328,11 @@ export default function NurseDashboard() {
                 {nurseId ? (
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
                     Nurse ID: <span className="font-mono">{nurseId}</span>
+                  </p>
+                ) : null}
+                {hospitalLabel ? (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
+                    Hospital: <span className="font-semibold">{hospitalLabel}</span>
                   </p>
                 ) : null}
               </div>
