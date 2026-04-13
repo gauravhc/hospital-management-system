@@ -61,7 +61,9 @@ app.use('/api/ambulances', require('./routes/ambulance.routes'));
 app.use('/api/ambulance', require('./routes/ambulanceRequest.routes'));
 app.use('/api/admin', require('./routes/adminAmbulance.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
+// Keep both singular + plural prefixes for compatibility with frontend calls.
 app.use('/api/patient', require('./routes/patientProfile.routes'));
+app.use('/api/patients', require('./routes/patientProfile.routes'));
 
 // ✅ START SERVER
 const startServer = async () => {

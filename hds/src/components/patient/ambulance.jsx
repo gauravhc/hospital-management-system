@@ -71,6 +71,7 @@ const PatientAmbulancePage = () => {
   const loadProfile = async () => {
     try {
       setProfileLoading(true);
+      // Use the same profile endpoint used across the patient portal.
       const res = await apiGet("/api/patients/profile");
       setProfile(res?.data || null);
     } catch {
