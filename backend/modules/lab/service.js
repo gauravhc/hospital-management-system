@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-const { query } = require("../../config/database");
-const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
-=======
 const { getConnection, query } = require("../../config/database");
 const { getHospitalColumn, getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
->>>>>>> 7fdfd7e (committing the changes)
 
 async function getSortClause(table, aliases = []) {
   const cols = await getTableColumns(table);
@@ -12,13 +7,46 @@ async function getSortClause(table, aliases = []) {
   return sortCol ? `\`${sortCol}\` DESC` : "`id` DESC";
 }
 
-<<<<<<< HEAD
+async function tests(hospitalId, filters = {}) {
+  const cols = await getTableColumns("lab_tests");
+  if (!cols) return [];
+
+  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId"]);
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  const hospitalCol = await getHospitalColumn("lab_tests");
+
+  const params = [];
+  let sql = `SELECT * FROM lab_tests`;
+  const where = [];
+  const orderBy = await getSortClause("lab_tests", ["created_at", "updated_at", "test_date", "id"]);
+
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+  if (filters.patient_id && patientCol) {
+    where.push(`\`${patientCol}\` = ?`);
+    params.push(filters.patient_id);
+  }
+  if (filters.status && statusCol) {
+    where.push(`\`${statusCol}\` = ?`);
+    params.push(filters.status);
+  }
+
+  if (where.length) {
+    sql += ` WHERE ${where.join(" AND ")}`;
+  }
+
+  sql += ` ORDER BY ${orderBy}`;
+  return query(sql, params);
+}
+
 async function createTest(payload, hospitalId) {
   const cols = await getTableColumns("lab_tests");
   if (!cols) throw new Error("lab_tests table not found");
 
   const patientId = payload.patient_id || payload.patientId || null;
-  const testName = payload.test_name || payload.testName || null;
+  const testName = payload.test_name || payload.testName || payload.name || null;
   if (!patientId || !testName) {
     throw new Error("patient_id and test_name are required");
   }
@@ -33,10 +61,10 @@ async function createTest(payload, hospitalId) {
   const doctorCol = firstExistingColumn(cols, ["doctor_id", "doctorId"]);
   if (doctorCol) record[doctorCol] = payload.doctor_id || payload.doctorId || null;
 
-  const testNameCol = firstExistingColumn(cols, ["test_name", "name", "test"]);
+  const testNameCol = firstExistingColumn(cols, ["test_name", "testName", "name", "test"]);
   if (testNameCol) record[testNameCol] = String(testName).trim();
 
-  const testCodeCol = firstExistingColumn(cols, ["test_code", "code"]);
+  const testCodeCol = firstExistingColumn(cols, ["test_code", "testCode", "code"]);
   if (testCodeCol) record[testCodeCol] = payload.test_code || payload.testCode || null;
 
   const categoryCol = firstExistingColumn(cols, ["category", "department"]);
@@ -48,77 +76,21 @@ async function createTest(payload, hospitalId) {
   const statusCol = firstExistingColumn(cols, ["status"]);
   if (statusCol) record[statusCol] = payload.status || "ordered";
 
-  const notesCol = firstExistingColumn(cols, ["notes", "note", "remarks"]);
+  const notesCol = firstExistingColumn(cols, ["notes", "note", "remarks", "comments"]);
   if (notesCol) record[notesCol] = payload.notes || null;
 
-  const orderedAtCol = firstExistingColumn(cols, ["ordered_at"]);
-  if (orderedAtCol) record[orderedAtCol] = new Date();
+  const orderedAtCol = firstExistingColumn(cols, ["ordered_at", "created_at"]);
+  if (orderedAtCol && !record[orderedAtCol]) record[orderedAtCol] = new Date();
 
   const insertCols = Object.keys(record).filter((k) => cols.has(k));
+  if (!insertCols.length) throw new Error("lab_tests schema missing writable columns");
+
   const placeholders = insertCols.map(() => "?").join(", ");
   const values = insertCols.map((k) => record[k]);
 
   return query(
     `INSERT INTO lab_tests (${insertCols.map((c) => `\`${c}\``).join(", ")}) VALUES (${placeholders})`,
     values
-  );
-}
-
-function reports() {
-  return query(`SELECT * FROM lab_reports ORDER BY created_at DESC, id DESC`);
-}
-
-function createReport(payload) {
-  return query(
-    `INSERT INTO lab_reports (patient_id, test_name, result, status, report_date)
-     VALUES (?, ?, ?, ?, ?)`,
-=======
-async function tests(hospitalId, filters = {}) {
-  const params = [];
-  let sql = `SELECT * FROM lab_tests`;
-  const where = [];
-  const hospitalCol = await getHospitalColumn("lab_tests");
-  const orderBy = await getSortClause("lab_tests", ["created_at", "updated_at", "test_date", "id"]);
-
-  if (hospitalId && hospitalCol) {
-    where.push(`\`${hospitalCol}\` = ?`);
-    params.push(hospitalId);
-  }
-  if (filters.patient_id) {
-    where.push("patient_id = ?");
-    params.push(filters.patient_id);
-  }
-  if (filters.status) {
-    where.push("status = ?");
-    params.push(filters.status);
-  }
-
-  if (where.length) {
-    sql += ` WHERE ${where.join(" AND ")}`;
-  }
-
-  sql += ` ORDER BY ${orderBy}`;
-  return query(sql, params);
-}
-
-async function createTest(payload, hospitalId) {
-  if (!payload.patient_id) {
-    throw new Error("patient_id is required");
-  }
-
-  return query(
-    `INSERT INTO lab_tests (hospital_id, patient_id, doctor_id, test_name, test_code, status, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
->>>>>>> 7fdfd7e (committing the changes)
-    [
-      hospitalId || payload.hospital_id,
-      payload.patient_id,
-      payload.doctor_id || null,
-      payload.test_name,
-      payload.test_code || null,
-      payload.status || "ordered",
-      payload.notes || null,
-    ]
   );
 }
 

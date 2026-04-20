@@ -517,70 +517,6 @@ router.put("/nurse/update-task/:id", authMiddleware, async (req, res, next) => {
 
 router.post("/register/create", authMiddleware, async (req, res, next) => {
   try {
-<<<<<<< HEAD
-    const patientCols = await getTableColumns("patients");
-    if (!patientCols) return res.status(500).json({ success: false, message: "Patients table not found" });
-
-    const patientIdCol = firstExistingColumn(patientCols, ["id", "patient_id"]);
-    const nameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
-    const firstNameCol = firstExistingColumn(patientCols, ["first_name", "firstname", "given_name"]);
-    const lastNameCol = firstExistingColumn(patientCols, ["last_name", "lastname", "surname", "family_name"]);
-    const phoneCol = firstExistingColumn(patientCols, ["phone", "mobile"]);
-    const emailCol = firstExistingColumn(patientCols, ["email"]);
-    const genderCol = firstExistingColumn(patientCols, ["gender"]);
-    const dobCol = firstExistingColumn(patientCols, ["date_of_birth", "dob"]);
-    const statusCol = firstExistingColumn(patientCols, ["status"]);
-
-    const fullName = [req.body.first_name, req.body.last_name].filter(Boolean).join(" ").trim();
-
-    const values = {};
-    if (patientCols.has("hospital_id")) values.hospital_id = req.user.hospital_id || req.body.hospital_id || null;
-    if (firstNameCol) values[firstNameCol] = req.body.first_name || null;
-    if (lastNameCol) values[lastNameCol] = req.body.last_name || null;
-    if (nameCol) values[nameCol] = req.body.name || fullName || null;
-    if (emailCol) values[emailCol] = req.body.email || null;
-    if (phoneCol) values[phoneCol] = req.body.phone || req.body.mobile || null;
-    if (genderCol) values[genderCol] = req.body.gender || null;
-    if (dobCol) values[dobCol] = req.body.date_of_birth || req.body.dob || null;
-    if (statusCol) values[statusCol] = req.body.status || "active";
-
-    const insertCols = Object.keys(values).filter((key) => patientCols.has(key));
-    if (!insertCols.length) {
-      return res.status(500).json({ success: false, message: "No compatible columns found for patients table" });
-    }
-
-    const placeholders = insertCols.map(() => "?").join(", ");
-    const result = await query(
-      `INSERT INTO patients (${insertCols.map((c) => `\`${c}\``).join(", ")}) VALUES (${placeholders})`,
-      insertCols.map((c) => values[c])
-    );
-
-    let id = result?.insertId || null;
-    if (!id && patientIdCol && (values[emailCol] || values[phoneCol])) {
-      const whereParts = [];
-      const params = [];
-      if (emailCol && values[emailCol]) {
-        whereParts.push(`\`${emailCol}\` = ?`);
-        params.push(values[emailCol]);
-      }
-      if (phoneCol && values[phoneCol]) {
-        whereParts.push(`\`${phoneCol}\` = ?`);
-        params.push(values[phoneCol]);
-      }
-
-      const createdAtCol = patientCols.has("created_at") ? "created_at" : null;
-      const orderCol = createdAtCol || (patientCols.has(patientIdCol) ? patientIdCol : null);
-      const orderSql = orderCol ? ` ORDER BY \`${orderCol}\` DESC` : "";
-
-      const rows = await query(
-        `SELECT \`${patientIdCol}\` AS id FROM patients WHERE ${whereParts.join(" OR ")}${orderSql} LIMIT 1`,
-        params
-      );
-      id = rows?.[0]?.id || null;
-    }
-
-    res.status(201).json({ success: true, message: "Patient created", id, patient: { id } });
-=======
     const patientsService = require("../modules/patients/service");
 
     const fullName = String(
@@ -652,7 +588,6 @@ router.post("/register/create", authMiddleware, async (req, res, next) => {
             phone,
           },
     });
->>>>>>> 7fdfd7e (committing the changes)
   } catch (error) {
     next(error);
   }

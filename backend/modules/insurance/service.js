@@ -1,9 +1,5 @@
 const { query } = require("../../config/database");
-<<<<<<< HEAD
-const { getTableColumns } = require("../../services/dbMeta");
-=======
 const { getHospitalColumn, getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
->>>>>>> 7fdfd7e (committing the changes)
 
 async function buildOrderBy(table) {
   const cols = await getTableColumns(table);
@@ -208,7 +204,6 @@ async function createPolicy(payload, hospitalId) {
     insertCols.map((col) => values[col])
   );
 }
-<<<<<<< HEAD
 
 async function createPatientInsurance(payload = {}, hospitalId = null) {
   const cols = await getTableColumns("patient_insurance");
@@ -258,21 +253,14 @@ async function getPatientInsurance(patientId) {
 
 module.exports = {
   claims,
-=======
-module.exports = {
-  claims,
   claimsByPatient,
->>>>>>> 7fdfd7e (committing the changes)
   createClaim,
   updateClaim,
   policies,
   createPolicy,
-<<<<<<< HEAD
   createPatientInsurance,
   getPatientInsurance,
-=======
   patientInsuranceDetails,
   createPatientInsuranceDetail,
   updatePatientInsuranceDetail,
->>>>>>> 7fdfd7e (committing the changes)
 };

@@ -180,18 +180,11 @@ async function hospitalRequests(user, { status } = {}) {
   const statuses = parseStatuses(status);
 
   const params = [hospitalId];
-<<<<<<< HEAD
-  const whereParts = ["ar.hospital_id = ?"];
+  const whereParts = [hospitalCol ? `ar.\`${hospitalCol}\` = ?` : "ar.hospital_id = ?"];
+
   if (statuses.length) {
     whereParts.push(`LOWER(REPLACE(ar.status, '_', '')) IN (${statuses.map(() => "?").join(", ")})`);
     params.push(...statuses);
-=======
-  let where = hospitalCol ? `WHERE ar.\`${hospitalCol}\` = ?` : "WHERE 1 = 1";
-  if (!hospitalCol) params.length = 0;
-  if (status) {
-    where += " AND LOWER(ar.status) = ?";
-    params.push(String(status).toLowerCase());
->>>>>>> 7fdfd7e (committing the changes)
   }
 
   return query(

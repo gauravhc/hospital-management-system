@@ -37,13 +37,8 @@ async function list(hospitalId) {
   const externalPatientIdCol = firstExistingColumn(patientCols, ["patient_id", "patient_id_no"]);
   const patientHospitalCol = firstExistingColumn(patientCols, ["hospital_id"]);
   const nameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
-<<<<<<< HEAD
   const firstNameCol = firstExistingColumn(patientCols, ["first_name", "firstname", "given_name"]);
   const lastNameCol = firstExistingColumn(patientCols, ["last_name", "lastname", "surname", "family_name"]);
-=======
-  const firstNameCol = firstExistingColumn(patientCols, ["first_name"]);
-  const lastNameCol = firstExistingColumn(patientCols, ["last_name"]);
->>>>>>> 7fdfd7e (committing the changes)
   const phoneCol = firstExistingColumn(patientCols, ["phone", "mobile"]);
   const emailCol = firstExistingColumn(patientCols, ["email"]);
   const createdAtCol = firstExistingColumn(patientCols, ["created_at"]);
@@ -56,17 +51,13 @@ async function list(hospitalId) {
 
   const select = [
     patientIdCol ? `p.\`${patientIdCol}\` AS id` : "p.id AS id",
-<<<<<<< HEAD
+    externalPatientIdCol ? `p.\`${externalPatientIdCol}\` AS patient_id` : `p.\`${patientIdCol || "id"}\` AS patient_id`,
     nameCol
       ? `p.\`${nameCol}\` AS name`
       : firstNameCol || lastNameCol
         ? `TRIM(CONCAT_WS(' ', ${firstNameCol ? `p.\`${firstNameCol}\`` : "''"}, ${lastNameCol ? `p.\`${lastNameCol}\`` : "''"})) AS name`
         : "NULL AS name",
-=======
-    externalPatientIdCol ? `p.\`${externalPatientIdCol}\` AS patient_id` : `p.\`${patientIdCol || "id"}\` AS patient_id`,
-    `${nameExpr} AS name`,
     `${nameExpr} AS full_name`,
->>>>>>> 7fdfd7e (committing the changes)
     phoneCol ? `p.\`${phoneCol}\` AS phone` : "NULL AS phone",
     phoneCol ? `p.\`${phoneCol}\` AS mobile` : "NULL AS mobile",
     emailCol ? `p.\`${emailCol}\` AS email` : "NULL AS email",

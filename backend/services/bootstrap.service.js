@@ -570,21 +570,16 @@ async function ensureLegacyRoleImageColumns() {
   await ensure("nurses");
 }
 
-<<<<<<< HEAD
 async function ensureStaffProfessionalColumns() {
   const ensure = async (table) => {
-=======
-async function ensureLegacyInsuranceSchema() {
-  const ensureColumns = async (table, definitions) => {
->>>>>>> 7fdfd7e (committing the changes)
     clearTableColumnsCache(table);
     const cols = await getTableColumns(table);
     if (!cols) return;
 
-<<<<<<< HEAD
     const addColumnIfMissing = async (name, ddl) => {
       if (cols.has(name)) return;
       await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+      cols.add(name);
     };
 
     await addColumnIfMissing("qualification", "`qualification` VARCHAR(255) NULL");
@@ -634,7 +629,12 @@ async function ensureLabTestExtensions() {
   }
 }
 
-=======
+async function ensureLegacyInsuranceSchema() {
+  const ensureColumns = async (table, definitions) => {
+    clearTableColumnsCache(table);
+    const cols = await getTableColumns(table);
+    if (!cols) return;
+
     for (const [name, ddl] of definitions) {
       if (cols.has(name)) continue;
       await query(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
@@ -652,13 +652,13 @@ async function ensureLabTestExtensions() {
   ]);
 
   await ensureColumns("claims", [
-      ["hospital_id", "`hospital_id` INT NULL"],
-      ["notes", "`notes` TEXT NULL"],
-      ["attachment_url", "`attachment_url` VARCHAR(500) NULL"],
-      ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
-      ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
-    ]);
-  }
+    ["hospital_id", "`hospital_id` INT NULL"],
+    ["notes", "`notes` TEXT NULL"],
+    ["attachment_url", "`attachment_url` VARCHAR(500) NULL"],
+    ["created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP"],
+    ["updated_at", "`updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"],
+  ]);
+}
 
 async function ensureLegacyBillingSchema() {
   const ensureColumns = async (table, definitions) => {
@@ -897,7 +897,6 @@ async function ensureLegacyPharmacySchema() {
   clearTableColumnsCache("invoice_items");
 }
 
->>>>>>> 7fdfd7e (committing the changes)
 async function ensureErpRoleImageColumns() {
   const ensure = async (table) => {
     clearTableColumnsCache(table);
@@ -1291,16 +1290,13 @@ async function ensureErpSchema() {
 
     await ensureLegacyStaffSchema();
     await ensureLegacyRoleImageColumns();
-<<<<<<< HEAD
     await ensureStaffProfessionalColumns();
-=======
     await ensureLegacyInsuranceSchema();
     await ensureLegacyBillingSchema();
     await ensureLegacyLabSchema();
     await ensureLegacyInventorySchema();
     await ensureLegacyHrSchema();
     await ensureLegacyPharmacySchema();
->>>>>>> 7fdfd7e (committing the changes)
     await ensureNurseModuleTables();
     await ensureNotificationsTable();
     await ensureHospitalExtensions();

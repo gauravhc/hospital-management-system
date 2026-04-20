@@ -71,23 +71,9 @@ export default function SuperAdminDashboard() {
         apiClient.get(`/api/super-admins?t=${Date.now()}`),
       ]);
 
-<<<<<<< HEAD
-      setStats(statRes.data || { hospitals: 0, admins: 0, staff: 0 });
-      setHospitals(Array.isArray(hospRes.data?.hospitals) ? hospRes.data.hospitals : []);
-      const superAdminPayload = saRes.data;
-      const superAdminRows = Array.isArray(superAdminPayload)
-        ? superAdminPayload
-        : Array.isArray(superAdminPayload?.data)
-          ? superAdminPayload.data
-          : Array.isArray(superAdminPayload?.admins)
-            ? superAdminPayload.admins
-            : [];
-      setSuperAdmins(superAdminRows);
-=======
       setStats(normalizeStatsPayload(statRes.data));
       setHospitals(extractArray(hospRes.data, ["hospitals"]));
       setSuperAdmins(extractArray(saRes.data, ["admins", "superAdmins", "super_admins"]));
->>>>>>> 7fdfd7e (committing the changes)
       setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Error loading super admin dashboard:", err);

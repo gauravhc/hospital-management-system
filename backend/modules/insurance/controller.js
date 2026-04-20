@@ -43,7 +43,6 @@ async function patientInsuranceDetails(req, res) { return ok(res, await service.
 async function createPatientInsuranceDetail(req, res) { await service.createPatientInsuranceDetail(req.body, getScopedHospitalId(req)); return ok(res, null, "Insurance detail saved", 201); }
 async function updatePatientInsuranceDetail(req, res) { await service.updatePatientInsuranceDetail(req.params.id, req.body); return ok(res, null, "Insurance detail updated"); }
 
-<<<<<<< HEAD
 function isPatient(req) {
   return String(req.user?.role || "").toLowerCase() === "patient";
 }
@@ -118,20 +117,15 @@ async function getPatientInsurance(req, res) {
   return res.json({ success: true, message: "Success", data: latest, history: rows });
 }
 
-=======
->>>>>>> 7fdfd7e (committing the changes)
 module.exports = {
   claims,
   createClaim,
   updateClaim,
   policies,
   createPolicy,
-<<<<<<< HEAD
   createPatientInsurance,
   getPatientInsurance,
-=======
   patientInsuranceDetails,
   createPatientInsuranceDetail,
   updatePatientInsuranceDetail,
->>>>>>> 7fdfd7e (committing the changes)
 };

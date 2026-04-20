@@ -16,11 +16,18 @@ const apiRoutes = require("./routes");
 
 const app = express();
 
-<<<<<<< HEAD
-for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents"), path.join("uploads", "staff"), path.join("uploads", "hospitals"), path.join("uploads", "insurance")]) {
-=======
-for (const dir of ["uploads", path.join("uploads", "lab"), path.join("uploads", "patients"), path.join("uploads", "profile_images"), path.join("uploads", "patient_documents"), path.join("uploads", "staff_documents"), path.join("uploads", "claim_documents")]) {
->>>>>>> 7fdfd7e (committing the changes)
+for (const dir of [
+  "uploads",
+  path.join("uploads", "lab"),
+  path.join("uploads", "patients"),
+  path.join("uploads", "profile_images"),
+  path.join("uploads", "patient_documents"),
+  path.join("uploads", "staff_documents"),
+  path.join("uploads", "staff"),
+  path.join("uploads", "hospitals"),
+  path.join("uploads", "insurance"),
+  path.join("uploads", "claim_documents"),
+]) {
   fs.mkdirSync(path.join(__dirname, dir), { recursive: true });
 }
 
