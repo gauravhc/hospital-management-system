@@ -12,8 +12,7 @@ import {
   Search,
 } from "lucide-react";
 
-const pageShell =
-  "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.10),_transparent_32%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]";
+const pageShell = "min-h-screen bg-white";
 const surfaceCard =
   "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
 

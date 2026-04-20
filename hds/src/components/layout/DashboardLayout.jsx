@@ -25,7 +25,7 @@ export default function DashboardLayout({ children, role, navItems }) {
     }, [roleTitle, user?.email, user?.username]);
 
     return (
-        <div className="flex h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
+        <div className="flex h-screen bg-white overflow-hidden flex-col md:flex-row">
             {/* Sidebar - Desktop */}
             <div className="hidden md:block h-full z-40 relative">
                 <Sidebar role={role} />
@@ -47,13 +47,7 @@ export default function DashboardLayout({ children, role, navItems }) {
 
                 {/* Content */}
                 <main
-                    className="flex-1 overflow-y-auto p-4 md:p-8 w-full"
-                    style={{
-                        backgroundImage: "url('/images/Bg-image.webp')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundAttachment: "fixed"
-                    }}
+                    className="flex-1 overflow-y-auto p-4 md:p-8 w-full bg-white"
                 >
                     <div className="max-w-7xl mx-auto pb-20 md:pb-0">
                         {/* Fade in animation wrapper could go here */}

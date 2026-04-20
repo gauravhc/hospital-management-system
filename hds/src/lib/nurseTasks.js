@@ -4,17 +4,24 @@ const ensureNurseTasksTable = async () => {
   await db.query(`
     CREATE TABLE IF NOT EXISTS nurse_tasks (
       id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-      nurse_id INT NOT NULL,
       hospital_id INT NULL,
+      nurse_id INT NULL,
+      assigned_nurse_id INT NULL,
       patient_id INT NULL,
       appointment_id INT NULL,
+      doctor_id INT NULL,
       task_title VARCHAR(255) NOT NULL,
       description TEXT NULL,
-      status VARCHAR(30) NOT NULL DEFAULT 'pending',
+      treatment TEXT NULL,
+      tests TEXT NULL,
+      status ENUM('pending','accepted','in_progress','completed') NOT NULL DEFAULT 'pending',
+      priority ENUM('low','medium','high') DEFAULT 'medium',
+      assigned_by INT NULL,
       updated_value TEXT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_nurse_tasks_nurse_id (nurse_id),
+      INDEX idx_nurse_tasks_assigned_nurse_id (assigned_nurse_id),
       INDEX idx_nurse_tasks_hospital_id (hospital_id),
       INDEX idx_nurse_tasks_patient_id (patient_id)
     )

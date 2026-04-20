@@ -89,6 +89,7 @@ async function assignTask({ hospitalId, assignedBy, nurseId, patientId, taskTitl
     nurse_id: nurseId ?? null,
     assigned_nurse_id: nurseId ?? null,
     patient_id: patientId,
+    doctor_id: assignedBy ?? null,
     task_title: taskTitle,
     title: taskTitle,
     treatment: normalizedTreatment || null,
@@ -142,9 +143,11 @@ async function acceptTask({ taskId, hospitalId, nurseId }) {
   const idCol = firstExistingColumn(cols, ["id", "task_id"]);
   const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
   const statusCol = firstExistingColumn(cols, ["status"]);
-  const nurseCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+  const assignedNurseCol = firstExistingColumn(cols, ["assigned_nurse_id"]);
+  const nurseCol = firstExistingColumn(cols, ["nurse_id"]);
+  const effectiveNurseCol = assignedNurseCol || nurseCol;
 
-  if (!idCol || !statusCol || !nurseCol) throw new Error("nurse_tasks schema missing required columns");
+  if (!idCol || !statusCol || !effectiveNurseCol) throw new Error("nurse_tasks schema missing required columns");
 
   const where = [`\`${idCol}\` = ?`];
   const params = [taskId];
@@ -161,7 +164,7 @@ async function acceptTask({ taskId, hospitalId, nurseId }) {
   }
 
   const current = normalizeStatus(task[statusCol] || "pending");
-  const existingNurseId = task[nurseCol];
+  const existingNurseId = task[effectiveNurseCol];
 
   if (current !== "pending") {
     const err = new Error(`Only pending tasks can be accepted (current: ${current || "unknown"})`);
@@ -175,10 +178,35 @@ async function acceptTask({ taskId, hospitalId, nurseId }) {
     throw err;
   }
 
-  await query(
-    `UPDATE nurse_tasks SET \`${nurseCol}\` = ?, \`${statusCol}\` = 'accepted' WHERE ${where.join(" AND ")}`,
-    [nurseId, ...params]
+  const updateParts = [];
+  const updateParams = [];
+
+  // Keep both columns in sync when both exist.
+  if (assignedNurseCol) {
+    updateParts.push(`\`${assignedNurseCol}\` = ?`);
+    updateParams.push(nurseId);
+  }
+  if (nurseCol) {
+    updateParts.push(`\`${nurseCol}\` = ?`);
+    updateParams.push(nurseId);
+  }
+  updateParts.push(`\`${statusCol}\` = 'accepted'`);
+
+  const acceptWhere = [...where, `\`${statusCol}\` = 'pending'`, `(\`${effectiveNurseCol}\` IS NULL OR \`${effectiveNurseCol}\` = ?)`];
+  const acceptParams = [...updateParams, ...params, nurseId];
+
+  const result = await query(
+    `UPDATE nurse_tasks SET ${updateParts.join(", ")} WHERE ${acceptWhere.join(" AND ")}`,
+    acceptParams
   );
+
+  if (!result?.affectedRows) {
+    const latest = await getTaskById(taskId, hospitalId);
+    const err = new Error("Task already taken");
+    err.statusCode = 409;
+    err.data = latest;
+    throw err;
+  }
 
   return getTaskById(taskId, hospitalId);
 }

@@ -59,8 +59,11 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
 
   const taskIdCol = firstExistingColumn(taskCols, ["id", "task_id"]);
   const taskHospitalCol = firstExistingColumn(taskCols, ["hospital_id"]);
-  const taskNurseCol = firstExistingColumn(taskCols, ["assigned_nurse_id", "nurse_id"]);
+  const assignedNurseCol = firstExistingColumn(taskCols, ["assigned_nurse_id"]);
+  const legacyNurseCol = firstExistingColumn(taskCols, ["nurse_id"]);
+  const taskNurseCol = assignedNurseCol || legacyNurseCol;
   const taskPatientCol = firstExistingColumn(taskCols, ["patient_id"]);
+  const taskDoctorCol = firstExistingColumn(taskCols, ["doctor_id"]);
   const titleCol = firstExistingColumn(taskCols, ["task_title", "title"]);
   const descriptionCol = firstExistingColumn(taskCols, ["description"]);
   const treatmentCol = firstExistingColumn(taskCols, ["treatment"]);
@@ -89,8 +92,10 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
   const select = [
     `t.\`${taskIdCol}\` AS id`,
     taskHospitalCol ? `t.\`${taskHospitalCol}\` AS hospital_id` : "NULL AS hospital_id",
-    `t.\`${taskNurseCol}\` AS nurse_id`,
+    assignedNurseCol ? `t.\`${assignedNurseCol}\` AS assigned_nurse_id` : "NULL AS assigned_nurse_id",
+    legacyNurseCol ? `t.\`${legacyNurseCol}\` AS nurse_id` : "NULL AS nurse_id",
     taskPatientCol ? `t.\`${taskPatientCol}\` AS patient_id` : "NULL AS patient_id",
+    taskDoctorCol ? `t.\`${taskDoctorCol}\` AS doctor_id` : "NULL AS doctor_id",
     titleCol ? `t.\`${titleCol}\` AS task_title` : "NULL AS task_title",
     treatmentCol ? `t.\`${treatmentCol}\` AS treatment` : "NULL AS treatment",
     testsCol ? `t.\`${testsCol}\` AS tests` : "NULL AS tests",
@@ -120,10 +125,16 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
   }
 
   // Nurses should see:
-  // - unassigned tasks for their hospital (pending)
-  // - tasks accepted/started by themselves
-  where.push(`(t.\`${taskNurseCol}\` IS NULL OR t.\`${taskNurseCol}\` = ?)`);
-  params.push(nurseId);
+  // - all pending tasks for the hospital
+  // - all accepted tasks for the hospital (so they can see "Taken")
+  // - all tasks assigned to themselves (accepted/in_progress/completed)
+  if (statusCol) {
+    where.push(`(t.\`${statusCol}\` IN ('pending','accepted') OR t.\`${taskNurseCol}\` = ?)`);
+    params.push(nurseId);
+  } else {
+    where.push(`(t.\`${taskNurseCol}\` IS NULL OR t.\`${taskNurseCol}\` = ?)`);
+    params.push(nurseId);
+  }
 
   const sql = `SELECT ${select.join(", ")}
     FROM nurse_tasks t
@@ -167,7 +178,7 @@ async function updateTaskStatus({ taskId, nurseId, hospitalId, status }) {
   if (!taskCols) return { updated: false };
 
   const taskIdCol = firstExistingColumn(taskCols, ["id", "task_id"]);
-  const taskNurseCol = firstExistingColumn(taskCols, ["nurse_id"]);
+  const taskNurseCol = firstExistingColumn(taskCols, ["assigned_nurse_id", "nurse_id"]);
   const taskHospitalCol = firstExistingColumn(taskCols, ["hospital_id"]);
   const statusCol = firstExistingColumn(taskCols, ["status"]);
   if (!taskIdCol || !taskNurseCol || !statusCol) return { updated: false };

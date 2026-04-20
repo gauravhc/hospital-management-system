@@ -67,12 +67,26 @@ export default function DoctorAssignTaskPage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const onTestsChange = (e) => {
-    const selected = Array.from(e.target.selectedOptions || []).map((opt) => opt.value);
-    setForm((prev) => ({ ...prev, tests: selected }));
-  };
-
   const TEST_OPTIONS = useMemo(() => LAB_TESTS_FLAT.map((t) => t.name), []);
+
+  const toggleTest = (testName) => {
+    const name = String(testName || "").trim();
+    if (!name) return;
+
+    setForm((prev) => {
+      const alreadySelected = prev.tests.includes(name);
+      if (alreadySelected) {
+        return { ...prev, tests: prev.tests.filter((t) => t !== name) };
+      }
+
+      if (prev.tests.length >= 2) {
+        setToast({ type: "error", message: "You can select up to 2 tests." });
+        return prev;
+      }
+
+      return { ...prev, tests: [...prev.tests, name] };
+    });
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -159,19 +173,32 @@ export default function DoctorAssignTaskPage() {
 
           <div>
             <label className="text-sm font-semibold text-slate-700">Tests</label>
-            <select
-              multiple
-              value={form.tests}
-              onChange={onTestsChange}
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm min-h-[120px]"
-            >
-              {TEST_OPTIONS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">Hold Ctrl/Cmd to select multiple.</p>
+            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-auto pr-1">
+                {TEST_OPTIONS.map((t) => {
+                  const checked = form.tests.includes(t);
+                  const disabled = !checked && form.tests.length >= 2;
+                  return (
+                    <label
+                      key={t}
+                      className={`flex items-start gap-2 text-sm ${disabled ? "opacity-60" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={() => toggleTest(t)}
+                        className="mt-1"
+                      />
+                      <span>{t}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Select up to 2 tests ({form.tests.length}/2).
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

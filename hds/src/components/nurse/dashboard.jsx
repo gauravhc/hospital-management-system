@@ -8,6 +8,8 @@ import { Activity, CheckCircle, ClipboardList, Clock, FileText } from "lucide-re
 
 const statusOf = (value) => String(value || "").trim().toLowerCase();
 const priorityOf = (value) => String(value || "medium").trim().toLowerCase();
+const assignedNurseOf = (task) =>
+  String(task?.assigned_nurse_id || task?.assignedNurseId || task?.nurse_id || task?.nurseId || "").trim();
 
 const backendBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
@@ -457,47 +459,99 @@ export default function NurseDashboard() {
                             </div>
                           </div>
 
-                          <div className="flex flex-col gap-2">
-                            {statusOf(task.status) === "pending" ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateTaskStatus(task, "accept");
-                                }}
-                                className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-sky-700"
-                              >
-                                Accept
-                              </button>
-                            ) : null}
-                            {statusOf(task.status) === "accepted" ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateTaskStatus(task, "start");
-                                }}
-                                className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-sky-700"
-                              >
-                                Start
-                              </button>
-                            ) : null}
-                            {statusOf(task.status) === "in_progress" ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateTaskStatus(task, "complete");
-                                }}
-                                className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-emerald-700"
-                              >
-                                Complete
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+	                          <div className="flex flex-col gap-2">
+	                            {(() => {
+	                              const assignedTo = assignedNurseOf(task);
+	                              const myId = String(nurseId || "").trim();
+	                              const isMine = assignedTo && myId && assignedTo === myId;
+	                              const isTaken = assignedTo && myId && assignedTo !== myId;
+	                              const s = statusOf(task.status);
+
+	                              if (s === "pending") {
+	                                if (isTaken) {
+	                                  return (
+	                                    <button
+	                                      type="button"
+	                                      disabled
+	                                      className="rounded-xl bg-slate-200 px-3 py-1.5 text-xs font-extrabold text-slate-600 dark:bg-slate-700 dark:text-slate-200 cursor-not-allowed"
+	                                    >
+	                                      Taken
+	                                    </button>
+	                                  );
+	                                }
+	                                return (
+	                                  <button
+	                                    type="button"
+	                                    onClick={(e) => {
+	                                      e.stopPropagation();
+	                                      updateTaskStatus(task, "accept");
+	                                    }}
+	                                    className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-sky-700"
+	                                  >
+	                                    Accept
+	                                  </button>
+	                                );
+	                              }
+
+	                              if (s === "accepted") {
+	                                if (!isMine) {
+	                                  return (
+	                                    <button
+	                                      type="button"
+	                                      disabled
+	                                      className="rounded-xl bg-slate-200 px-3 py-1.5 text-xs font-extrabold text-slate-600 dark:bg-slate-700 dark:text-slate-200 cursor-not-allowed"
+	                                    >
+	                                      Taken
+	                                    </button>
+	                                  );
+	                                }
+	                                return (
+	                                  <button
+	                                    type="button"
+	                                    onClick={(e) => {
+	                                      e.stopPropagation();
+	                                      updateTaskStatus(task, "start");
+	                                    }}
+	                                    className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-sky-700"
+	                                  >
+	                                    Start
+	                                  </button>
+	                                );
+	                              }
+
+	                              if (s === "in_progress") {
+	                                if (isTaken && !isMine) {
+	                                  return (
+	                                    <button
+	                                      type="button"
+	                                      disabled
+	                                      className="rounded-xl bg-slate-200 px-3 py-1.5 text-xs font-extrabold text-slate-600 dark:bg-slate-700 dark:text-slate-200 cursor-not-allowed"
+	                                    >
+	                                      Taken
+	                                    </button>
+	                                  );
+	                                }
+	                                if (!isMine) return null;
+	                                return (
+	                                  <button
+	                                    type="button"
+	                                    onClick={(e) => {
+	                                      e.stopPropagation();
+	                                      updateTaskStatus(task, "complete");
+	                                    }}
+	                                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-emerald-700"
+	                                  >
+	                                    Complete
+	                                  </button>
+	                                );
+	                              }
+
+	                              return null;
+	                            })()}
+	                          </div>
+	                        </div>
+	                      </div>
+	                    ))}
                     {filtered.length === 0 ? (
                       <div className="text-center text-slate-400 text-sm py-10">No tasks found.</div>
                     ) : null}

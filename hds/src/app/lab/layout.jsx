@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Sidebar from "@/components/sidebar/sidebar";
 import MobileTabNav from "@/components/layout/MobileTabNav";
 
@@ -12,15 +12,13 @@ const NAV_ITEMS = [
 ];
 
 export default function LabLayout({ children }) {
-    const [username, setUsername] = useState("");
-
-    useEffect(() => {
-        const user = localStorage.getItem("username");
-        setUsername(user || "Lab Tech");
-    }, []);
+    const [username] = useState(() => {
+        if (typeof window === "undefined") return "Lab Tech";
+        return localStorage.getItem("username") || "Lab Tech";
+    });
 
     return (
-        <div className="flex min-h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
+        <div className="flex min-h-screen bg-white overflow-hidden flex-col md:flex-row">
             {/* Sidebar - Desktop Only */}
             <div className="hidden md:block h-full">
                 <Sidebar role="lab" />
@@ -35,12 +33,7 @@ export default function LabLayout({ children }) {
                 />
 
                 <main
-                    className="flex-1 overflow-y-auto p-4 md:p-8"
-                    style={{
-                        backgroundImage: "url('/images/Bg-image.webp')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                    }}
+                    className="flex-1 overflow-y-auto p-4 md:p-8 bg-white"
                 >
                     {children}
                 </main>

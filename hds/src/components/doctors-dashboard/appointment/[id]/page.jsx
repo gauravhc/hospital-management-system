@@ -25,23 +25,25 @@ function AppointmentDetails({ params }) {
   const [selectedTests, setSelectedTests] = useState([]);
   const [labTests, setLabTests] = useState([]);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
+  const toggleLabTest = (name) => {
+    const testName = String(name || "").trim();
+    if (!testName) return;
 
-    fetchDetails(token);
-    fetchNurses(token);
-    fetchNurseUpdates(token, id);
-    fetchLabTests(token, id);
-  }, [router, id]);
+    setSelectedTests((prev) => {
+      const alreadySelected = prev.includes(testName);
+      if (alreadySelected) return prev.filter((t) => t !== testName);
+      if (prev.length >= 2) {
+        alert("You can select up to 2 tests.");
+        return prev;
+      }
+      return [...prev, testName];
+    });
+  };
 
   // ----------------------------------------------------------
   // FETCH APPOINTMENT DETAILS
   // ----------------------------------------------------------
-  const fetchDetails = async (token) => {
+  async function fetchDetails(token) {
     try {
       const res = await fetch(`${API_URL}/api/appointments/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -58,12 +60,12 @@ function AppointmentDetails({ params }) {
       console.error(err);
       setError("Server error fetching details");
     }
-  };
+  }
 
   // ----------------------------------------------------------
   // FETCH NURSE LIST
   // ----------------------------------------------------------
-  const fetchNurses = async (token) => {
+  async function fetchNurses(token) {
     try {
       const res = await fetch(`${API_URL}/api/hr/nurses-list`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -74,12 +76,12 @@ function AppointmentDetails({ params }) {
     } catch (err) {
       console.error("Nurse Fetch Error:", err);
     }
-  };
+  }
 
   // ----------------------------------------------------------
   // FETCH NURSE UPDATES (Vitals from nurse)
   // ----------------------------------------------------------
-  const fetchNurseUpdates = async (token, appointmentId) => {
+  async function fetchNurseUpdates(token, appointmentId) {
     try {
       const res = await fetch(
         `${API_URL}/api/doctors/nurse-updates/${appointmentId}`,
@@ -98,12 +100,12 @@ function AppointmentDetails({ params }) {
       console.error("Fetch nurse updates error:", err);
       setNurseUpdates([]);
     }
-  };
+  }
 
   // ----------------------------------------------------------
   // ASSIGN NURSE + CREATE NURSE TASK
   // ----------------------------------------------------------
-  const assignNurse = async () => {
+  async function assignNurse() {
     if (!selectedNurse) return alert("Please select a nurse");
 
     const token = localStorage.getItem("token");
@@ -140,12 +142,12 @@ function AppointmentDetails({ params }) {
       console.error("Assign nurse error:", err);
       alert("Server error assigning task");
     }
-  };
+  }
 
   // ----------------------------------------------------------
   // REQUEST LAB TEST
   // ----------------------------------------------------------
-  const requestLabTest = async () => {
+  async function requestLabTest() {
     if (!selectedTests || selectedTests.length === 0) {
       alert("Please select at least one test");
       return;
@@ -184,12 +186,12 @@ function AppointmentDetails({ params }) {
       console.error("Lab Test Error:", err);
       alert("Server error requesting lab test");
     }
-  };
+  }
 
   // ----------------------------------------------------------
   // FETCH LAB TESTS FOR THIS APPOINTMENT
   // ----------------------------------------------------------
-  const fetchLabTests = async (token, appointmentId) => {
+  async function fetchLabTests(token, appointmentId) {
     try {
       const res = await fetch(
         `${API_URL}/api/lab/appointment/${appointmentId}`,
@@ -204,7 +206,24 @@ function AppointmentDetails({ params }) {
       console.error("Fetch lab tests error:", err);
       setLabTests([]);
     }
-  };
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      fetchDetails(token);
+      fetchNurses(token);
+      fetchNurseUpdates(token, id);
+      fetchLabTests(token, id);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [router, id]);
 
   const getStatusColor = (status) => {
     if (status === "completed") return "#16a34a"; // green
@@ -429,24 +448,36 @@ function AppointmentDetails({ params }) {
             </h3>
 
             <div className="space-y-3">
-              <select
-                multiple
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
-                value={selectedTests}
-                onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions).map((o) => o.value);
-                  setSelectedTests(values);
-                }}
-              >
-                <option value="CBC">CBC</option>
-                <option value="Blood Sugar">Blood Sugar</option>
-                <option value="KFT">KFT</option>
-                <option value="LFT">LFT</option>
-                <option value="X-Ray Chest">X-Ray Chest</option>
-                <option value="ECG">ECG</option>
-                <option value="Urine Test">Urine Test</option>
-                <option value="Thyroid Profile">Thyroid Profile</option>
-              </select>
+              <div className="rounded-xl border border-slate-300 bg-white p-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-auto pr-1">
+                  {[
+                    "CBC",
+                    "Blood Sugar",
+                    "KFT",
+                    "LFT",
+                    "X-Ray Chest",
+                    "ECG",
+                    "Urine Test",
+                    "Thyroid Profile",
+                  ].map((t) => {
+                    const checked = selectedTests.includes(t);
+                    const disabled = !checked && selectedTests.length >= 2;
+                    return (
+                      <label key={t} className={`flex items-start gap-2 ${disabled ? "opacity-60" : ""}`}>
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggleLabTest(t)}
+                        />
+                        <span>{t}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">Select up to 2 tests ({selectedTests.length}/2).</p>
+              </div>
 
               <textarea
                 placeholder="Notes for lab (optional)"

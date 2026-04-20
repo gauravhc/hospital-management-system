@@ -287,12 +287,7 @@ export default function DoctorPage() {
 
       {/* MAIN CONTENT AREA */}
       <main
-        className="flex-1 px-6 py-8"
-        style={{
-          backgroundImage: "url('/images/Bg-image.webp')", // Ensure this path is valid or remove if unnecessary
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+        className={`flex-1 px-6 py-8 ${isDark ? "bg-slate-900" : "bg-white"}`}
       >
 
         {/* HEADER */}

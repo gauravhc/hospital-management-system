@@ -239,15 +239,24 @@ const statements = [
   `
     CREATE TABLE IF NOT EXISTS nurse_tasks (
       id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-      nurse_id VARCHAR(36) NOT NULL,
-      hospital_id VARCHAR(36) NOT NULL,
-      title VARCHAR(255) NOT NULL,
-      description TEXT,
-      status ENUM('pending','in_progress','completed') DEFAULT 'pending',
+      hospital_id VARCHAR(36) NULL,
+      patient_id VARCHAR(36) NULL,
+      doctor_id VARCHAR(36) NULL,
+      nurse_id VARCHAR(36) NULL,
+      assigned_nurse_id VARCHAR(36) NULL,
+      task_title VARCHAR(255) NULL,
+      title VARCHAR(255) NULL,
+      description TEXT NULL,
+      treatment TEXT NULL,
+      tests TEXT NULL,
+      priority ENUM('low','medium','high') DEFAULT 'medium',
+      assigned_by VARCHAR(36) NULL,
+      status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending',
       due_at DATETIME NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_nurse_tasks_nurse (nurse_id),
+      INDEX idx_nurse_tasks_assigned_nurse (assigned_nurse_id),
       INDEX idx_nurse_tasks_hospital (hospital_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `,
@@ -918,10 +927,14 @@ async function ensureNurseModuleTables() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         hospital_id INT NULL,
         nurse_id INT NULL,
+        assigned_nurse_id INT NULL,
         patient_id INT NULL,
+        doctor_id INT NULL,
         task_title VARCHAR(255) NULL,
         description TEXT NULL,
-        status ENUM('pending','in_progress','completed') DEFAULT 'pending',
+        treatment TEXT NULL,
+        tests TEXT NULL,
+        status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending',
         priority ENUM('low','medium','high') DEFAULT 'medium',
         assigned_by INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -942,6 +955,45 @@ async function ensureNurseModuleTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
+    // Backfill/upgrade schemas created by older dumps (e.g. nurse_id NOT NULL, missing treatment/tests).
+    clearTableColumnsCache("nurse_tasks");
+    const nurseTaskCols = await getTableColumns("nurse_tasks");
+    if (nurseTaskCols) {
+      const addColumnIfMissing = async (name, ddl) => {
+        if (nurseTaskCols.has(name)) return;
+        await query(`ALTER TABLE nurse_tasks ADD COLUMN ${ddl}`);
+        nurseTaskCols.add(name);
+      };
+
+      await addColumnIfMissing("hospital_id", "`hospital_id` INT NULL");
+      await addColumnIfMissing("assigned_nurse_id", "`assigned_nurse_id` INT NULL");
+      await addColumnIfMissing("patient_id", "`patient_id` INT NULL");
+      await addColumnIfMissing("doctor_id", "`doctor_id` INT NULL");
+      await addColumnIfMissing("task_title", "`task_title` VARCHAR(255) NULL");
+      await addColumnIfMissing("description", "`description` TEXT NULL");
+      await addColumnIfMissing("treatment", "`treatment` TEXT NULL");
+      await addColumnIfMissing("tests", "`tests` TEXT NULL");
+      await addColumnIfMissing("priority", "`priority` ENUM('low','medium','high') DEFAULT 'medium'");
+      await addColumnIfMissing("assigned_by", "`assigned_by` INT NULL");
+      await addColumnIfMissing("created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+
+      // Allow unassigned tasks so any nurse in the hospital can accept them.
+      try {
+        await query("ALTER TABLE nurse_tasks MODIFY COLUMN nurse_id INT NULL");
+      } catch (err) {
+        // Ignore if already nullable or if schema differs.
+      }
+
+      // Allow "accepted" status for the nurse task workflow (pending -> accepted -> in_progress -> completed).
+      try {
+        await query(
+          "ALTER TABLE nurse_tasks MODIFY COLUMN status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending'"
+        );
+      } catch (err) {
+        // Some schemas may not use ENUM or may restrict ALTER; ignore to avoid boot failures.
+      }
+    }
+
     clearTableColumnsCache("nurse_tasks");
     clearTableColumnsCache("patient_vitals");
     return;
@@ -953,15 +1005,20 @@ async function ensureNurseModuleTables() {
       id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
       hospital_id VARCHAR(36) NULL,
       nurse_id VARCHAR(36) NULL,
+      assigned_nurse_id VARCHAR(36) NULL,
       patient_id VARCHAR(36) NULL,
+      doctor_id VARCHAR(36) NULL,
       task_title VARCHAR(255) NULL,
       description TEXT NULL,
-      status ENUM('pending','in_progress','completed') DEFAULT 'pending',
+      treatment TEXT NULL,
+      tests TEXT NULL,
+      status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending',
       priority ENUM('low','medium','high') DEFAULT 'medium',
       assigned_by VARCHAR(36) NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_nurse_tasks_hospital (hospital_id),
       INDEX idx_nurse_tasks_nurse (nurse_id),
+      INDEX idx_nurse_tasks_assigned_nurse (assigned_nurse_id),
       INDEX idx_nurse_tasks_patient (patient_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
@@ -993,29 +1050,39 @@ async function ensureNurseModuleTables() {
       await query(`ALTER TABLE nurse_tasks ADD COLUMN ${ddl}`);
     };
 
-    await addColumnIfMissing("hospital_id", "`hospital_id` VARCHAR(36) NULL");
-    await addColumnIfMissing("nurse_id", "`nurse_id` VARCHAR(36) NULL");
-    await addColumnIfMissing("patient_id", "`patient_id` VARCHAR(36) NULL");
-    await addColumnIfMissing("task_title", "`task_title` VARCHAR(255) NULL");
-    await addColumnIfMissing("description", "`description` TEXT NULL");
-    await addColumnIfMissing("treatment", "`treatment` TEXT NULL");
-    await addColumnIfMissing("tests", "`tests` TEXT NULL");
-    await addColumnIfMissing("priority", "`priority` ENUM('low','medium','high') DEFAULT 'medium'");
-    await addColumnIfMissing("assigned_by", "`assigned_by` VARCHAR(36) NULL");
-    await addColumnIfMissing("created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
-  }
+	    await addColumnIfMissing("hospital_id", "`hospital_id` VARCHAR(36) NULL");
+	    await addColumnIfMissing("nurse_id", "`nurse_id` VARCHAR(36) NULL");
+	    await addColumnIfMissing("assigned_nurse_id", "`assigned_nurse_id` VARCHAR(36) NULL");
+	    await addColumnIfMissing("patient_id", "`patient_id` VARCHAR(36) NULL");
+	    await addColumnIfMissing("doctor_id", "`doctor_id` VARCHAR(36) NULL");
+	    await addColumnIfMissing("task_title", "`task_title` VARCHAR(255) NULL");
+	    await addColumnIfMissing("description", "`description` TEXT NULL");
+	    await addColumnIfMissing("treatment", "`treatment` TEXT NULL");
+	    await addColumnIfMissing("tests", "`tests` TEXT NULL");
+	    await addColumnIfMissing("priority", "`priority` ENUM('low','medium','high') DEFAULT 'medium'");
+	    await addColumnIfMissing("assigned_by", "`assigned_by` VARCHAR(36) NULL");
+	    await addColumnIfMissing("created_at", "`created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+	  }
 
-  // Allow "accepted" status for the nurse task workflow (pending -> accepted -> in_progress -> completed).
-  try {
+	  // Allow "accepted" status for the nurse task workflow (pending -> accepted -> in_progress -> completed).
+	  try {
     // Best-effort enum upgrade; if status is already compatible, this will be a no-op.
     await query(
       "ALTER TABLE nurse_tasks MODIFY COLUMN status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending'"
     );
     clearTableColumnsCache("nurse_tasks");
-  } catch (err) {
-    // Some schemas may not use ENUM or may restrict ALTER; ignore to avoid boot failures.
-  }
-}
+	  } catch (err) {
+	    // Some schemas may not use ENUM or may restrict ALTER; ignore to avoid boot failures.
+	  }
+
+	  // Allow unassigned tasks on existing deployments that created nurse_id as NOT NULL.
+	  try {
+	    await query("ALTER TABLE nurse_tasks MODIFY COLUMN nurse_id VARCHAR(36) NULL");
+	    clearTableColumnsCache("nurse_tasks");
+	  } catch (err) {
+	    // Ignore (legacy schemas may use INT or already be nullable).
+	  }
+	}
 
 async function ensureNotificationsTable() {
   const mode = await getSchemaMode();
