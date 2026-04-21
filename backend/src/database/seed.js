@@ -59,7 +59,7 @@ const seed = async () => {
     console.log('  ✓ Roles seeded');
 
     // ─── SUPER ADMIN USER ─────────────────────
-    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@dscape.ai';
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'superadmin@medicorevault.ai';
     const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin@123';
     const passwordHash = await bcrypt.hash(superAdminPassword, 12);
 
@@ -81,8 +81,8 @@ const seed = async () => {
       `INSERT IGNORE INTO hospitals 
         (id, name, address, phone, email, license_no, bed_capacity, settings)
        VALUES 
-        ('demo-hosp-001', 'Dscape AI Medical Center', '123 Health Street, Medical District', 
-         '+1 56654 65656', 'admin@dscape.ai', 'HOSP-2024-001', 500,
+        ('demo-hosp-001', 'Medicore vault Medical Center', '123 Health Street, Medical District', 
+         '+1 56654 65656', 'admin@medicorevault.ai', 'HOSP-2024-001', 500,
          '{"theme": "blue", "currency": "USD", "timezone": "Asia/Kolkata"}')
       `
     );
@@ -126,7 +126,7 @@ const seed = async () => {
     await connection.commit();
     console.log('\n✅ Database seeded successfully!');
     console.log('\n📋 Default Credentials:');
-    console.log('   Super Admin : superadmin@dscape.ai / SuperAdmin@123');
+    console.log('   Super Admin : superadmin@medicorevault.ai / SuperAdmin@123');
     console.log('   Hospital Admin: admin@hds.com / Admin@123');
   } catch (error) {
     await connection.rollback();

@@ -93,7 +93,7 @@ Authorization: Bearer <access_token>
 ### Default Credentials (after seeding)
 | Role | Email | Password |
 |------|-------|----------|
-| Super Admin | superadmin@dscape.ai | SuperAdmin@123 |
+| Super Admin | superadmin@medicorevault.ai | SuperAdmin@123 |
 | Hospital Admin | admin@hds.com | Admin@123 |
 
 ---
@@ -382,7 +382,7 @@ http://localhost:5000/api
   "pickup_location": "123 Main Street, City",
   "pickup_lat": 12.9716,
   "pickup_lng": 77.5946,
-  "destination": "Dscape AI Medical Center",
+  "destination": "Medicore vault Medical Center",
   "emergency_type": "Cardiac Arrest",
   "priority": "critical"
 }

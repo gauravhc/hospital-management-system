@@ -12,7 +12,7 @@ const Footer = () => {
                             <div className="w-10 h-10 bg-[#0E82FD] rounded-full flex items-center justify-center text-white">
                                 <span className="font-bold text-xl">+</span>
                             </div>
-                            <span className="font-bold text-2xl text-white">Dscape.AI</span>
+                            <span className="font-bold text-2xl text-white">Medicore vault</span>
                         </Link>
                         <p className="text-gray-400 mb-8 leading-relaxed">
                             Accessible & Reliable Healthcare Simplified. We provide the best medical services with top-notch facilities and expert doctors.
@@ -115,7 +115,7 @@ const Footer = () => {
 
                 <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
                     <p className="text-gray-500 text-sm">
-                        Copyright © {new Date().getFullYear()} Dscape.AI. All rights reserved.
+                        Copyright © {new Date().getFullYear()} Medicore vault. All rights reserved.
                     </p>
                     <div className="flex space-x-6 text-sm text-gray-500">
                         <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>

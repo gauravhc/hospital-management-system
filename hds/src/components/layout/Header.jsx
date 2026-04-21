@@ -103,7 +103,7 @@ const Header = () => {
                         <div className="flex-shrink-0 flex items-center">
                             <Link href="/" className="flex items-center gap-2">
                                 <span className="font-bold text-2xl text-[#1B2559] flex items-center gap-2">
-                                    <span className="text-[#0E82FD] text-3xl leading-none">+</span> Dscape.AI
+                                    <span className="text-[#0E82FD] text-3xl leading-none">+</span> Medicore vault
                                 </span>
                             </Link>
                         </div>

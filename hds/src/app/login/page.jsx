@@ -118,7 +118,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-900 text-white p-12">
         <div className="flex flex-col justify-center">
           <h1 className="text-5xl font-extrabold mb-6">
-            Dscape<span className="text-blue-200">.AI</span>
+            Medicore<span className="text-blue-200"> vault</span>
           </h1>
           <h2 className="text-3xl font-bold mb-4">
             Next Generation Healthcare Management
