@@ -8,8 +8,9 @@ const pageShell = "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,2
 const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
 
 const normalizeStatus = (value) => {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().toLowerCase();
   if (!raw) return "Unknown";
+  if (raw === "final") return "Completed";
   return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
@@ -58,8 +59,8 @@ export default function LabReportsPage() {
   const summary = useMemo(() => {
     return {
       total: reports.length,
-      final: reports.filter((report) => String(report?.status || "").toLowerCase() === "final").length,
-      completed: reports.filter((report) => String(report?.status || "").toLowerCase() === "completed").length,
+      pending: reports.filter((report) => String(report?.status || "").toLowerCase() === "pending").length,
+      completed: reports.filter((report) => ["completed", "final"].includes(String(report?.status || "").toLowerCase())).length,
     };
   }, [reports]);
 
@@ -83,8 +84,8 @@ export default function LabReportsPage() {
             <p className="mt-3 text-3xl font-bold text-slate-900">{summary.total}</p>
           </div>
           <div className="rounded-[28px] border border-sky-100 bg-sky-50/95 p-6 shadow-[0_16px_40px_-28px_rgba(14,165,233,0.45)]">
-            <p className="text-sm text-sky-700">Final status</p>
-            <p className="mt-3 text-3xl font-bold text-sky-900">{summary.final}</p>
+            <p className="text-sm text-sky-700">Pending status</p>
+            <p className="mt-3 text-3xl font-bold text-sky-900">{summary.pending}</p>
           </div>
           <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/95 p-6 shadow-[0_16px_40px_-28px_rgba(16,185,129,0.45)]">
             <p className="text-sm text-emerald-700">Completed status</p>

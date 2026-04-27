@@ -1,5 +1,5 @@
 const { query } = require("../../config/database");
-const { getTableColumns, firstExistingColumn } = require("../../services/dbMeta");
+const { getTableColumns, firstExistingColumn, clearTableColumnsCache } = require("../../services/dbMeta");
 const usersService = require("../users/service");
 
 const columnTypeCache = new Map();
@@ -27,6 +27,26 @@ async function resolveTable(candidates = []) {
     if (cols) return { table, cols };
   }
   return null;
+}
+
+async function ensureLabBookingPatientColumn(table) {
+  if (!table) return null;
+
+  clearTableColumnsCache(table);
+  let cols = await getTableColumns(table);
+  if (!cols) return null;
+
+  let patientCol = firstExistingColumn(cols, ["patient_id", "patientId", "user_id", "userId"]);
+  if (patientCol) return { cols, patientCol };
+
+  const fallbackColumn = table === "lab_orders" ? "patient_id" : "patient_id";
+  await query(`ALTER TABLE \`${table}\` ADD COLUMN \`${fallbackColumn}\` VARCHAR(36) NULL`);
+
+  clearTableColumnsCache(table);
+  cols = await getTableColumns(table);
+  patientCol = firstExistingColumn(cols, ["patient_id", "patientId", "user_id", "userId"]);
+
+  return patientCol ? { cols, patientCol } : null;
 }
 
 async function list(hospitalId) {
@@ -496,11 +516,11 @@ async function deleteDocument(patientId, documentId) {
 }
 
 async function listLabTests(patientId) {
-  const resolved = await resolveTable(["lab_tests"]);
+  const resolved = await resolveTable(["lab_tests", "lab_orders"]);
   if (!resolved) return [];
   const cols = resolved.cols;
 
-  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId"]);
+  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId", "user_id", "userId"]);
   if (!patientCol) return [];
 
   const orderCol = cols.has("ordered_at")
@@ -516,13 +536,15 @@ async function listLabTests(patientId) {
 }
 
 async function orderLabTest(patientId, payload = {}) {
-  const resolved = await resolveTable(["lab_tests"]);
-  if (!resolved) throw new Error("lab_tests table not found");
-  const cols = resolved.cols;
+  const resolved = await resolveTable(["lab_tests", "lab_orders"]);
+  if (!resolved) throw new Error("lab booking table not found");
+
+  const patientRef = await ensureLabBookingPatientColumn(resolved.table);
+  const cols = patientRef?.cols || resolved.cols;
 
   const record = {};
-  const patientCol = firstExistingColumn(cols, ["patient_id", "patientId"]);
-  if (!patientCol) throw new Error("lab_tests schema missing patient_id");
+  const patientCol = patientRef?.patientCol || firstExistingColumn(cols, ["patient_id", "patientId", "user_id", "userId"]);
+  if (!patientCol) throw new Error(`${resolved.table} schema missing patient reference`);
   record[patientCol] = patientId;
 
   const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
@@ -544,7 +566,10 @@ async function orderLabTest(patientId, payload = {}) {
   if (notesCol) record[notesCol] = payload.notes || null;
 
   const statusCol = firstExistingColumn(cols, ["status"]);
-  if (statusCol) record[statusCol] = payload.status || "ordered";
+  if (statusCol) {
+    const defaultStatus = resolved.table === "lab_orders" ? "pending" : "ordered";
+    record[statusCol] = payload.status || defaultStatus;
+  }
 
   const orderedAtCol = firstExistingColumn(cols, ["ordered_at"]);
   if (orderedAtCol) record[orderedAtCol] = new Date();

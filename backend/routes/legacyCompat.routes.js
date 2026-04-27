@@ -1314,7 +1314,9 @@ router.get("/lab/appointment/:appointmentId", authMiddleware, async (req, res, n
 
 router.get("/lab", authMiddleware, async (req, res, next) => {
   try {
+    const labTestCols = await getTableColumns("lab_tests");
     const labOrderCols = await getTableColumns("lab_orders");
+    const labReportCols = await getTableColumns("lab_reports");
     const patientCols = await getTableColumns("patients");
     const doctorCols = await getTableColumns("doctors");
     const appointmentCols = await getTableColumns("appointments");
@@ -1322,56 +1324,171 @@ router.get("/lab", authMiddleware, async (req, res, next) => {
     const patientNameCol = firstExistingColumn(patientCols, ["full_name", "name"]);
     const doctorNameCol = firstExistingColumn(doctorCols, ["full_name", "name"]);
     const labOrderHospitalCol = firstExistingColumn(labOrderCols, ["hospital_id", "hospitalId"]);
+    const labTestHospitalCol = firstExistingColumn(labTestCols, ["hospital_id", "hospitalId"]);
     const appointmentHospitalCol = firstExistingColumn(appointmentCols, ["hospital_id", "hospitalId"]);
     const patientHospitalCol = firstExistingColumn(patientCols, ["hospital_id", "hospitalId"]);
     const doctorHospitalCol = firstExistingColumn(doctorCols, ["hospital_id", "hospitalId"]);
     const labOrderSortCol = firstExistingColumn(labOrderCols, ["created_at", "updated_at", "id"]);
-    const appointmentSortCol = firstExistingColumn(appointmentCols, ["created_at", "appointment_date", "id"]);
+    const labTestSortCol = firstExistingColumn(labTestCols, ["created_at", "updated_at", "ordered_at", "id"]);
 
-    const patientNameSelect = patientNameCol ? `p.\`${patientNameCol}\` AS patient_name` : "NULL AS patient_name";
-    const doctorNameSelect = doctorNameCol ? `d.\`${doctorNameCol}\` AS doctor_name` : "NULL AS doctor_name";
-    const hospitalFilterColumn = labOrderHospitalCol
-      ? `lo.\`${labOrderHospitalCol}\``
-      : appointmentHospitalCol || doctorHospitalCol || patientHospitalCol
-        ? `COALESCE(${[
-            appointmentHospitalCol ? `a.\`${appointmentHospitalCol}\`` : null,
-            doctorHospitalCol ? `d.\`${doctorHospitalCol}\`` : null,
-            patientHospitalCol ? `p.\`${patientHospitalCol}\`` : null,
-          ].filter(Boolean).join(", ")})`
-        : null;
-    const orderByClause = labOrderSortCol
-      ? `lo.\`${labOrderSortCol}\` DESC`
-      : appointmentSortCol
-        ? `a.\`${appointmentSortCol}\` DESC`
-        : "lo.id DESC";
+    const rows = [];
 
-    const joins = [
-      "LEFT JOIN patients p ON p.id = lo.patient_id",
-      "LEFT JOIN doctors d ON d.id = lo.doctor_id",
-    ];
+    if (labOrderCols) {
+      const patientNameSelect = patientNameCol ? `p.\`${patientNameCol}\` AS patient_name` : "NULL AS patient_name";
+      const doctorNameSelect = doctorNameCol ? `d.\`${doctorNameCol}\` AS doctor_name` : "NULL AS doctor_name";
+      const hospitalFilterColumn = labOrderHospitalCol
+        ? `lo.\`${labOrderHospitalCol}\``
+        : appointmentHospitalCol || doctorHospitalCol || patientHospitalCol
+          ? `COALESCE(${[
+              appointmentHospitalCol ? `a.\`${appointmentHospitalCol}\`` : null,
+              doctorHospitalCol ? `d.\`${doctorHospitalCol}\`` : null,
+              patientHospitalCol ? `p.\`${patientHospitalCol}\`` : null,
+            ].filter(Boolean).join(", ")})`
+          : null;
+      const orderByClause = labOrderSortCol
+        ? `lo.\`${labOrderSortCol}\` DESC`
+        : appointmentHospitalCol
+          ? `a.\`${appointmentHospitalCol}\` DESC`
+          : "lo.id DESC";
 
-    if (appointmentHospitalCol) {
-      joins.push("LEFT JOIN appointments a ON a.id = lo.appointment_id");
+      const joins = [
+        "LEFT JOIN patients p ON p.id = lo.patient_id",
+        "LEFT JOIN doctors d ON d.id = lo.doctor_id",
+      ];
+
+      if (appointmentHospitalCol) {
+        joins.push("LEFT JOIN appointments a ON a.id = lo.appointment_id");
+      }
+
+      const sql = `
+        SELECT lo.*, ${patientNameSelect}, ${doctorNameSelect}, 'lab_orders' AS source_table
+        FROM lab_orders lo
+        ${joins.join("\n        ")}
+        ${hospitalFilterColumn && req.user?.hospital_id != null ? `WHERE ${hospitalFilterColumn} = ?` : ""}
+        ORDER BY ${orderByClause}
+      `;
+
+      const orderRows = await query(
+        sql,
+        hospitalFilterColumn && req.user?.hospital_id != null ? [req.user.hospital_id] : []
+      );
+      rows.push(...orderRows);
     }
 
-    const sql = `
-      SELECT lo.*, ${patientNameSelect}, ${doctorNameSelect}
-      FROM lab_orders lo
-      ${joins.join("\n      ")}
-      ${hospitalFilterColumn && req.user?.hospital_id != null ? `WHERE ${hospitalFilterColumn} = ?` : ""}
-      ORDER BY ${orderByClause}
-    `;
+    if (labTestCols) {
+      const patientNameSelect = patientNameCol ? `p.\`${patientNameCol}\` AS patient_name` : "NULL AS patient_name";
+      const doctorNameSelect = doctorNameCol ? `d.\`${doctorNameCol}\` AS doctor_name` : "NULL AS doctor_name";
+      const patientJoinCol = firstExistingColumn(labTestCols, ["patient_id", "patientId", "user_id", "userId"]);
+      const doctorJoinCol = firstExistingColumn(labTestCols, ["doctor_id", "doctorId"]);
+      const testNameCol = firstExistingColumn(labTestCols, ["test_name", "name", "test"]);
+      const notesCol = firstExistingColumn(labTestCols, ["notes", "note", "remarks"]);
+      const statusCol = firstExistingColumn(labTestCols, ["status"]);
+      const testCodeCol = firstExistingColumn(labTestCols, ["test_code", "code"]);
+      const categoryCol = firstExistingColumn(labTestCols, ["category", "department"]);
+      const priceCol = firstExistingColumn(labTestCols, ["price", "amount"]);
+      const orderedAtCol = firstExistingColumn(labTestCols, ["ordered_at", "created_at", "updated_at"]);
+      const labReportStatusCol = firstExistingColumn(labReportCols, ["status"]);
+      const labReportFileCol = firstExistingColumn(labReportCols, ["file_url", "report_url", "result"]);
+      const labReportNotesCol = firstExistingColumn(labReportCols, ["notes", "comment", "comments", "description", "findings", "result_summary"]);
+      const labReportSortCol = firstExistingColumn(labReportCols, ["updated_at", "created_at", "id"]);
+      const labReportTestIdCol = firstExistingColumn(labReportCols, ["test_id"]);
+      const labReportOrderIdCol = firstExistingColumn(labReportCols, ["lab_order_id", "labOrderId"]);
+      const labReportPatientCol = firstExistingColumn(labReportCols, ["patient_id", "patientId"]);
+      const labReportTestNameCol = firstExistingColumn(labReportCols, ["test_name", "testName", "title"]);
+      const reportJoinPredicates = [
+        labReportTestIdCol ? `lr.\`${labReportTestIdCol}\` = lt.id` : null,
+        labReportOrderIdCol ? `lr.\`${labReportOrderIdCol}\` = lt.id` : null,
+        labReportPatientCol && patientJoinCol && labReportTestNameCol && testNameCol
+          ? `(
+              lr.\`${labReportPatientCol}\` = lt.\`${patientJoinCol}\`
+              AND LOWER(TRIM(COALESCE(lr.\`${labReportTestNameCol}\`, ''))) = LOWER(TRIM(COALESCE(lt.\`${testNameCol}\`, '')))
+            )`
+          : null,
+      ].filter(Boolean);
+      const reportJoinPredicate = reportJoinPredicates.join(" OR ");
+      const hospitalFilterColumn = labTestHospitalCol
+        ? `lt.\`${labTestHospitalCol}\``
+        : doctorHospitalCol || patientHospitalCol
+          ? `COALESCE(${[
+              doctorHospitalCol ? `d.\`${doctorHospitalCol}\`` : null,
+              patientHospitalCol ? `p.\`${patientHospitalCol}\`` : null,
+            ].filter(Boolean).join(", ")})`
+          : null;
 
-    const rows = await query(
-      sql,
-      hospitalFilterColumn && req.user?.hospital_id != null ? [req.user.hospital_id] : []
-    );
-    const data = rows.map((row) => ({
-      ...row,
-      testName: row.test_name || row.testName,
-      patientName: row.patientName || row.patient_name,
-      doctorName: row.doctorName || row.doctor_name,
-    }));
+      const sql = `
+        SELECT
+          lt.\`id\` AS id,
+          ${patientJoinCol ? `lt.\`${patientJoinCol}\`` : "NULL"} AS patient_id,
+          ${doctorJoinCol ? `lt.\`${doctorJoinCol}\`` : "NULL"} AS doctor_id,
+          ${testNameCol ? `lt.\`${testNameCol}\`` : "'Lab Test'"} AS test_name,
+          ${notesCol ? `lt.\`${notesCol}\`` : "NULL"} AS notes,
+          ${statusCol ? `lt.\`${statusCol}\`` : "'ordered'"} AS status,
+          ${testCodeCol ? `lt.\`${testCodeCol}\`` : "NULL"} AS test_code,
+          ${categoryCol ? `lt.\`${categoryCol}\`` : "NULL"} AS category,
+          ${priceCol ? `lt.\`${priceCol}\`` : "NULL"} AS price,
+          ${orderedAtCol ? `lt.\`${orderedAtCol}\`` : "NULL"} AS ordered_at,
+          ${labTestHospitalCol ? `lt.\`${labTestHospitalCol}\`` : "NULL"} AS hospital_id,
+          ${
+            labReportStatusCol && reportJoinPredicate
+              ? `(SELECT lr.\`${labReportStatusCol}\` FROM lab_reports lr WHERE ${reportJoinPredicate} ORDER BY lr.\`${labReportSortCol || "id"}\` DESC LIMIT 1)`
+              : "NULL"
+          } AS report_status,
+          ${
+            labReportFileCol && reportJoinPredicate
+              ? `(SELECT lr.\`${labReportFileCol}\` FROM lab_reports lr WHERE ${reportJoinPredicate} ORDER BY lr.\`${labReportSortCol || "id"}\` DESC LIMIT 1)`
+              : "NULL"
+          } AS result,
+          ${
+            labReportNotesCol && reportJoinPredicate
+              ? `(SELECT lr.\`${labReportNotesCol}\` FROM lab_reports lr WHERE ${reportJoinPredicate} ORDER BY lr.\`${labReportSortCol || "id"}\` DESC LIMIT 1)`
+              : "NULL"
+          } AS report_notes,
+          ${patientNameSelect},
+          ${doctorNameSelect},
+          'lab_tests' AS source_table
+        FROM lab_tests lt
+        ${patientJoinCol ? `LEFT JOIN patients p ON p.id = lt.\`${patientJoinCol}\`` : "LEFT JOIN patients p ON 1 = 0"}
+        ${doctorJoinCol ? `LEFT JOIN doctors d ON d.id = lt.\`${doctorJoinCol}\`` : "LEFT JOIN doctors d ON 1 = 0"}
+        ${hospitalFilterColumn && req.user?.hospital_id != null ? `WHERE ${hospitalFilterColumn} = ?` : ""}
+        ORDER BY ${labTestSortCol ? `lt.\`${labTestSortCol}\`` : "lt.`id`"} DESC
+      `;
+
+      const testRows = await query(
+        sql,
+        hospitalFilterColumn && req.user?.hospital_id != null ? [req.user.hospital_id] : []
+      );
+      rows.push(...testRows);
+    }
+
+    const data = rows
+      .map((row) => {
+        const normalizedRowStatus = String(row.status || "").trim().toLowerCase();
+        const normalizedReportStatus = String(row.report_status || "").trim().toLowerCase();
+        const hasReportContent = Boolean(String(row.result || "").trim() || String(row.report_notes || "").trim());
+
+        return {
+          ...row,
+          testName: row.test_name || row.testName,
+          patientName: row.patientName || row.patient_name,
+          notes: row.report_notes || row.notes,
+          status:
+            normalizedReportStatus === "completed" ||
+            normalizedReportStatus === "final" ||
+            normalizedRowStatus === "completed" ||
+            normalizedRowStatus === "final" ||
+            (row.source_table === "lab_tests" && hasReportContent)
+              ? "completed"
+              : normalizedRowStatus === "ordered"
+                ? "pending"
+                : row.status,
+          doctorName: row.doctorName || row.doctor_name || (row.source_table === "lab_tests" ? "Self-booked" : null),
+        };
+      })
+      .sort((a, b) => {
+        const left = new Date(a.ordered_at || a.created_at || a.updated_at || 0).getTime();
+        const right = new Date(b.ordered_at || b.created_at || b.updated_at || 0).getTime();
+        return right - left;
+      });
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -1382,18 +1499,41 @@ router.post("/lab/update-result/:id", authMiddleware, labUpload.array("reports")
   try {
     const files = Array.isArray(req.files) ? req.files : [];
     const uploaded = files.map((file) => `/uploads/lab/${path.basename(file.path)}`);
+    const requestedSource = String(req.query?.source || "").trim().toLowerCase();
 
+    const labTestCols = await getTableColumns("lab_tests");
     const labOrderCols = await getTableColumns("lab_orders");
     const labReportCols = await getTableColumns("lab_reports");
-    const orderRows = await query(`SELECT * FROM lab_orders WHERE id = ? LIMIT 1`, [req.params.id]);
-    const order = orderRows[0] || null;
+    const shouldCheckOrders = !requestedSource || requestedSource === "lab_orders";
+    const shouldCheckTests = !requestedSource || requestedSource === "lab_tests";
+    const orderRows =
+      shouldCheckOrders && labOrderCols ? await query(`SELECT * FROM lab_orders WHERE id = ? LIMIT 1`, [req.params.id]) : [];
+    const testRows =
+      !orderRows.length && shouldCheckTests && labTestCols
+        ? await query(`SELECT * FROM lab_tests WHERE id = ? LIMIT 1`, [req.params.id])
+        : [];
+    const order = orderRows[0] || testRows[0] || null;
+    const sourceTable = orderRows[0] ? "lab_orders" : testRows[0] ? "lab_tests" : null;
 
     if (!order) {
-      return res.status(404).json({ success: false, message: "Lab order not found" });
+      return res.status(404).json({ success: false, message: "Lab request not found" });
     }
 
-    const orderStatusCol = firstExistingColumn(labOrderCols, ["status"]);
-    const orderNotesCol = firstExistingColumn(labOrderCols, ["notes", "comment", "comments", "description"]);
+    const sourceCols = sourceTable === "lab_tests" ? labTestCols : labOrderCols;
+    const sourcePatientCol = firstExistingColumn(sourceCols, ["patient_id", "patientId", "user_id", "userId"]);
+    const sourceDoctorCol = firstExistingColumn(sourceCols, ["doctor_id", "doctorId"]);
+    const sourceHospitalCol = firstExistingColumn(sourceCols, ["hospital_id", "hospitalId"]);
+    const sourceAppointmentCol = firstExistingColumn(sourceCols, ["appointment_id", "appointmentId"]);
+    const sourceTestNameCol = firstExistingColumn(sourceCols, ["test_name", "testName", "name", "test", "title"]);
+    const readSourceValue = (columnName, fallbackKeys = []) => {
+      if (columnName && order?.[columnName] !== undefined) return order[columnName];
+      for (const key of fallbackKeys) {
+        if (order?.[key] !== undefined) return order[key];
+      }
+      return null;
+    };
+    const orderStatusCol = firstExistingColumn(sourceCols, ["status"]);
+    const orderNotesCol = firstExistingColumn(sourceCols, ["notes", "comment", "comments", "description", "note", "remarks"]);
     const orderUpdates = [];
     const orderParams = [];
 
@@ -1409,11 +1549,12 @@ router.post("/lab/update-result/:id", authMiddleware, labUpload.array("reports")
 
     if (orderUpdates.length) {
       orderParams.push(req.params.id);
-      await query(`UPDATE lab_orders SET ${orderUpdates.join(", ")} WHERE id = ?`, orderParams);
+      await query(`UPDATE \`${sourceTable}\` SET ${orderUpdates.join(", ")} WHERE id = ?`, orderParams);
     }
 
     const reportValues = {};
-    const reportOrderRefCol = firstExistingColumn(labReportCols, ["lab_order_id", "labOrderId", "test_id"]);
+    const reportOrderRefCol = firstExistingColumn(labReportCols, ["lab_order_id", "labOrderId"]);
+    const reportTestRefCol = firstExistingColumn(labReportCols, ["test_id"]);
     const reportUrlCol = firstExistingColumn(labReportCols, ["report_url", "file_url"]);
     const reportResultCol = firstExistingColumn(labReportCols, ["result"]);
     const reportStatusCol = firstExistingColumn(labReportCols, ["status"]);
@@ -1425,16 +1566,19 @@ router.post("/lab/update-result/:id", authMiddleware, labUpload.array("reports")
     const reportTestNameCol = firstExistingColumn(labReportCols, ["test_name", "testName", "title"]);
     const reportDateCol = firstExistingColumn(labReportCols, ["report_date"]);
 
-    if (reportOrderRefCol) reportValues[reportOrderRefCol] = req.params.id;
+    if (sourceTable === "lab_orders" && reportOrderRefCol) reportValues[reportOrderRefCol] = req.params.id;
+    if (sourceTable === "lab_tests" && reportTestRefCol) reportValues[reportTestRefCol] = req.params.id;
+    if (sourceTable === "lab_tests" && reportOrderRefCol && !reportTestRefCol) reportValues[reportOrderRefCol] = req.params.id;
+    if (sourceTable === "lab_orders" && reportTestRefCol && !reportOrderRefCol) reportValues[reportTestRefCol] = req.params.id;
     if (reportUrlCol) reportValues[reportUrlCol] = uploaded[0] || null;
     if (reportResultCol) reportValues[reportResultCol] = JSON.stringify(uploaded);
     if (reportStatusCol) reportValues[reportStatusCol] = "completed";
     if (reportNotesCol) reportValues[reportNotesCol] = req.body.comment || null;
-    if (reportPatientCol) reportValues[reportPatientCol] = order.patient_id ?? null;
-    if (reportDoctorCol) reportValues[reportDoctorCol] = order.doctor_id ?? null;
-    if (reportHospitalCol) reportValues[reportHospitalCol] = order.hospital_id ?? req.user?.hospital_id ?? null;
-    if (reportAppointmentCol) reportValues[reportAppointmentCol] = order.appointment_id ?? null;
-    if (reportTestNameCol) reportValues[reportTestNameCol] = order.test_name || "Lab Report";
+    if (reportPatientCol) reportValues[reportPatientCol] = readSourceValue(sourcePatientCol, ["patient_id", "patientId", "user_id", "userId"]);
+    if (reportDoctorCol) reportValues[reportDoctorCol] = readSourceValue(sourceDoctorCol, ["doctor_id", "doctorId"]);
+    if (reportHospitalCol) reportValues[reportHospitalCol] = readSourceValue(sourceHospitalCol, ["hospital_id", "hospitalId"]) ?? req.user?.hospital_id ?? null;
+    if (reportAppointmentCol) reportValues[reportAppointmentCol] = readSourceValue(sourceAppointmentCol, ["appointment_id", "appointmentId"]);
+    if (reportTestNameCol) reportValues[reportTestNameCol] = readSourceValue(sourceTestNameCol, ["test_name", "testName", "name", "test", "title"]) || "Lab Report";
     if (reportDateCol) reportValues[reportDateCol] = new Date().toISOString().slice(0, 10);
 
     const reportColumns = Object.keys(reportValues);

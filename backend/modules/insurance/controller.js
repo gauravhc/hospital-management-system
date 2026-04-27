@@ -116,7 +116,6 @@ async function getPatientInsurance(req, res) {
   const latest = rows[0] || null;
   return res.json({ success: true, message: "Success", data: latest, history: rows });
 }
-
 module.exports = {
   claims,
   createClaim,

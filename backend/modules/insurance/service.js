@@ -154,7 +154,10 @@ async function createClaim(payload, hospitalId) {
 }
 
 function updateClaim(id, payload) {
-  return query(`UPDATE claims SET status = COALESCE(?, status), notes = COALESCE(?, notes) WHERE id = ?`, [payload.status || null, payload.notes || null, id]);
+  return query(
+    `UPDATE claims SET status = COALESCE(?, status), notes = COALESCE(?, notes) WHERE id = ?`,
+    [payload.status || null, payload.notes || null, id]
+  );
 }
 
 async function policies(hospitalId) {

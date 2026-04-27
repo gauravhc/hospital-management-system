@@ -48,6 +48,17 @@ const Hero = ({ pending, claims }) => (
 
 const testCategories = LAB_TEST_CATEGORIES;
 
+const resolveReportUrl = (report) =>
+  report?.file_url || report?.file_path || report?.report_url || report?.result || "";
+
+const normalizeReportStatus = (report) => {
+  const raw = String(report?.status || "").trim().toLowerCase();
+  if (raw === "final") return "Completed";
+  if (raw === "completed") return "Completed";
+  if (raw === "draft") return "Pending";
+  return resolveReportUrl(report) ? "Completed" : "Pending";
+};
+
 const PatientLabPage = () => {
   const pending = useLiveCount("/api/lab/reports/pending/count", 15000);
   const claims = useLiveCount("/api/claims/active/count", 30000);
@@ -161,16 +172,32 @@ const PatientLabPage = () => {
               <div className="grid gap-4 md:grid-cols-2">
                 {labReports.map((report) => (
                   <div key={report.id || report.report_id} className="border rounded-xl p-4">
-                    <div className="text-sm text-slate-500">Test</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm text-slate-500">Test</div>
+                      <div
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          normalizeReportStatus(report) === "Completed"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {normalizeReportStatus(report)}
+                      </div>
+                    </div>
                     <div className="font-semibold text-slate-900">
-                      {report.test_name || report.testName || "Lab Report"}
+                      {report.title || report.test_name || report.testName || "Lab Report"}
                     </div>
                     <div className="mt-2 text-xs text-slate-500">
                       {report.created_at || report.date || "Recorded"}
                     </div>
-                    {report.file_path || report.report_url || report.result ? (
+                    {report.result_summary || report.findings || report.notes ? (
+                      <div className="mt-3 text-sm text-slate-600">
+                        {report.result_summary || report.findings || report.notes}
+                      </div>
+                    ) : null}
+                    {resolveReportUrl(report) ? (
                       <a
-                        href={report.file_path || report.report_url || report.result}
+                        href={resolveReportUrl(report)}
                         className="mt-3 inline-block text-sm text-sky-600"
                         target="_blank"
                         rel="noreferrer"

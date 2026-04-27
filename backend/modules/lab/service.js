@@ -18,7 +18,7 @@ async function tests(hospitalId, filters = {}) {
   const params = [];
   let sql = `SELECT * FROM lab_tests`;
   const where = [];
-  const orderBy = await getSortClause("lab_tests", ["created_at", "updated_at", "test_date", "id"]);
+  const orderBy = await getSortClause("lab_tests", ["created_at", "updated_at", "test_date", "id", "ordered_at"]);
 
   if (hospitalId && hospitalCol) {
     where.push(`\`${hospitalCol}\` = ?`);
@@ -168,6 +168,7 @@ async function reports(hospitalId, filters = {}) {
 
     return {
       ...row,
+      status: String(row.status || "").trim().toLowerCase() === "final" ? "completed" : row.status,
       title: row.normalized_title || row.title || row.test_name || row.testName || "Lab Report",
       result_summary: row.normalized_summary || row.result_summary || row.findings || row.notes || null,
       file_url: resolvedFileUrl,
@@ -205,7 +206,7 @@ async function createReport(payload, hospitalId) {
         payload.findings || null,
         payload.result_summary || payload.result || null,
         payload.file_url || null,
-        payload.status || "final",
+        payload.status || "completed",
       ]
     );
 
@@ -232,7 +233,7 @@ async function getReport(id) {
 
 async function updateReportFile(id, fileUrl) {
   await query(
-    `UPDATE lab_reports SET file_url = ?, status = 'final', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    `UPDATE lab_reports SET file_url = ?, status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     [fileUrl, id]
   );
   return getReport(id);

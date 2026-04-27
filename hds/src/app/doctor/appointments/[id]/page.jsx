@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Save, AlertTriangle, FlaskConical, CheckCircle2 } from "lucide-react";
@@ -43,16 +43,10 @@ export default function DoctorAppointmentManagePage() {
   const [prescriptionDuration, setPrescriptionDuration] = useState("");
   const [prescriptionItemNotes, setPrescriptionItemNotes] = useState("");
   const [prescriptionNotes, setPrescriptionNotes] = useState("");
-  const [prescriptionImage, setPrescriptionImage] = useState(null);
-  const [prescriptionImagePreview, setPrescriptionImagePreview] = useState("");
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraStarting, setCameraStarting] = useState(false);
   const [prescriptionLoading, setPrescriptionLoading] = useState(false);
   const [prescriptionSubmitting, setPrescriptionSubmitting] = useState(false);
   const [prescriptionMessage, setPrescriptionMessage] = useState("");
   const [prescriptionError, setPrescriptionError] = useState("");
-  const videoRef = useRef(null);
-  const cameraStreamRef = useRef(null);
   const resolvedAppointmentPatientId = useMemo(
     () => appointment?.patient_id ?? appointment?.patientId ?? "",
     [appointment]
@@ -92,30 +86,6 @@ export default function DoctorAppointmentManagePage() {
 
     if (appointmentId) load();
   }, [appointmentId, router]);
-
-  useEffect(() => {
-    return () => {
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-        cameraStreamRef.current = null;
-      }
-      if (prescriptionImagePreview) {
-        URL.revokeObjectURL(prescriptionImagePreview);
-      }
-    };
-  }, [prescriptionImagePreview]);
-
-  useEffect(() => {
-    if (!cameraOpen || !videoRef.current || !cameraStreamRef.current) return;
-
-    const video = videoRef.current;
-    video.srcObject = cameraStreamRef.current;
-    video
-      .play()
-      .catch(() => {
-        setPrescriptionError("Camera opened, but preview could not start. Please allow camera access and try again.");
-      });
-  }, [cameraOpen]);
 
   const loadLabTests = async () => {
     if (!appointmentId) return;
@@ -281,9 +251,6 @@ export default function DoctorAppointmentManagePage() {
       formData.append("doctor_id", String(resolvedAppointmentDoctorId || ""));
       formData.append("notes", prescriptionNotes.trim() || "");
       formData.append("items", JSON.stringify(prescriptionItems));
-      if (prescriptionImage) {
-        formData.append("prescription_image", prescriptionImage);
-      }
 
       const res = await apiPost("/api/pharmacy/prescriptions", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -295,94 +262,12 @@ export default function DoctorAppointmentManagePage() {
 
       setPrescriptionItems([]);
       setPrescriptionNotes("");
-      setPrescriptionImage(null);
-      setPrescriptionImagePreview("");
       setPrescriptionMessage("Prescription sent to pharmacy successfully.");
     } catch (err) {
       setPrescriptionError(err?.message || "Failed to save prescription.");
     } finally {
       setPrescriptionSubmitting(false);
     }
-  };
-
-  const handlePrescriptionImageChange = (event) => {
-    const file = event.target.files?.[0] || null;
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-      cameraStreamRef.current = null;
-      setCameraOpen(false);
-    }
-    if (prescriptionImagePreview) {
-      URL.revokeObjectURL(prescriptionImagePreview);
-    }
-    setPrescriptionImage(file);
-    setPrescriptionImagePreview(file ? URL.createObjectURL(file) : "");
-  };
-
-  const startCamera = async () => {
-    setPrescriptionError("");
-    setPrescriptionMessage("");
-    setCameraStarting(true);
-    try {
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
-
-      cameraStreamRef.current = stream;
-      setCameraOpen(true);
-    } catch (error) {
-      setPrescriptionError("Unable to open camera. You can allow camera access or use the mobile camera capture option.");
-      setCameraOpen(false);
-    } finally {
-      setCameraStarting(false);
-    }
-  };
-
-  const stopCamera = () => {
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-      cameraStreamRef.current = null;
-    }
-    setCameraOpen(false);
-  };
-
-  const capturePrescriptionPhoto = async () => {
-    if (!videoRef.current) return;
-
-    const video = videoRef.current;
-    const width = video.videoWidth || 1280;
-    const height = video.videoHeight || 720;
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      setPrescriptionError("Unable to capture the photo right now.");
-      return;
-    }
-
-    context.drawImage(video, 0, 0, width, height);
-
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        setPrescriptionError("Unable to capture the photo right now.");
-        return;
-      }
-
-      const file = new File([blob], `prescription-${Date.now()}.jpg`, { type: "image/jpeg" });
-      if (prescriptionImagePreview) {
-        URL.revokeObjectURL(prescriptionImagePreview);
-      }
-      setPrescriptionImage(file);
-      setPrescriptionImagePreview(URL.createObjectURL(file));
-      stopCamera();
-    }, "image/jpeg", 0.92);
   };
 
   return (
@@ -757,89 +642,6 @@ export default function DoctorAppointmentManagePage() {
                     />
                   </label>
 
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-sm font-medium text-slate-700">Prescription photo</span>
-                      <p className="mt-1 text-xs text-slate-500">Take the prescription photo directly and send it to the pharmacist with this prescription.</p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        disabled={cameraStarting}
-                        className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {cameraStarting ? "Opening camera..." : "Take Photo"}
-                      </button>
-
-                      <label className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                        Use Device Camera
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handlePrescriptionImageChange}
-                          className="hidden"
-                        />
-                      </label>
-
-                      {prescriptionImage ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (prescriptionImagePreview) {
-                              URL.revokeObjectURL(prescriptionImagePreview);
-                            }
-                            setPrescriptionImage(null);
-                            setPrescriptionImagePreview("");
-                          }}
-                          className="rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
-                        >
-                          Remove Photo
-                        </button>
-                      ) : null}
-                    </div>
-
-                    {cameraOpen ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className="w-full rounded-2xl bg-slate-950"
-                        />
-                        <div className="mt-4 flex flex-wrap gap-3">
-                          <button
-                            type="button"
-                            onClick={capturePrescriptionPhoto}
-                            className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                          >
-                            Capture Photo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={stopCamera}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {prescriptionImagePreview ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Image preview</p>
-                      <img
-                        src={prescriptionImagePreview}
-                        alt="Prescription preview"
-                        className="mt-3 max-h-64 w-full rounded-2xl object-contain"
-                      />
-                    </div>
-                  ) : null}
                 </div>
 
                 <div className="space-y-4">

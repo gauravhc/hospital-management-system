@@ -14,6 +14,8 @@ export default function PatientLabOrderPage() {
   const [processing, setProcessing] = useState(false);
   const [booked, setBooked] = useState(false);
   const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const selectedTestId = useMemo(() => {
     const raw = searchParams?.get("testId");
@@ -27,14 +29,18 @@ export default function PatientLabOrderPage() {
 
   useEffect(() => {
     setBooked(false);
+    setError("");
+    setMessage("");
   }, [selectedTestId]);
 
   const handleBook = async () => {
     if (!selected) return;
 
     setProcessing(true);
+    setError("");
+    setMessage("");
     try {
-      await apiPost("/api/patients/lab-tests", {
+      const response = await apiPost("/api/patients/lab-tests", {
         test_name: selected.name,
         test_code: selected.id,
         category: selected.category_title,
@@ -42,8 +48,9 @@ export default function PatientLabOrderPage() {
         notes: notes.trim() || null,
       });
       setBooked(true);
+      setMessage(response?.message || "Test booked successfully.");
     } catch (e) {
-      alert(e?.message || "Failed to book test");
+      setError(e?.message || "Failed to book test");
     } finally {
       setProcessing(false);
     }
@@ -128,9 +135,15 @@ export default function PatientLabOrderPage() {
                   />
                 </div>
 
-                {booked ? (
+                {message ? (
                   <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    Test booked successfully.
+                    {message}
+                  </div>
+                ) : null}
+
+                {error ? (
+                  <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    {error}
                   </div>
                 ) : null}
               </section>

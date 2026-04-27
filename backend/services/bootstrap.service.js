@@ -896,7 +896,6 @@ async function ensureLegacyPharmacySchema() {
   clearTableColumnsCache("pharmacy_order_items");
   clearTableColumnsCache("invoice_items");
 }
-
 async function ensureErpRoleImageColumns() {
   const ensure = async (table) => {
     clearTableColumnsCache(table);

@@ -90,6 +90,7 @@ export default function PharmacyInvoice() {
           if (!acc[key]) {
             acc[key] = {
               id: row.id,
+              status: row.status || "active",
               notes: row.notes || "",
               image_url: row.image_url || null,
               created_at: row.created_at || null,
@@ -108,7 +109,9 @@ export default function PharmacyInvoice() {
           return acc;
         }, {});
 
-        const nextPrescriptions = Object.values(grouped);
+        const nextPrescriptions = Object.values(grouped).filter(
+          (entry) => !["dispensed", "completed"].includes(String(entry.status || "").toLowerCase())
+        );
         setPrescriptions(nextPrescriptions);
         setSelectedPrescriptionId(nextPrescriptions[0]?.id ? String(nextPrescriptions[0].id) : "");
       } catch (error) {

@@ -181,7 +181,6 @@ async function hospitalRequests(user, { status } = {}) {
 
   const params = [hospitalId];
   const whereParts = [hospitalCol ? `ar.\`${hospitalCol}\` = ?` : "ar.hospital_id = ?"];
-
   if (statuses.length) {
     whereParts.push(`LOWER(REPLACE(ar.status, '_', '')) IN (${statuses.map(() => "?").join(", ")})`);
     params.push(...statuses);

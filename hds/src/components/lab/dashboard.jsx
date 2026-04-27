@@ -18,6 +18,8 @@ const surfaceCard =
 
 const normalizeStatus = (value) => {
   const raw = String(value || "pending").trim().toLowerCase();
+  if (raw === "ordered") return "Pending";
+  if (raw === "final") return "Completed";
   if (raw === "in-progress") return "In Progress";
   return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 };
@@ -28,6 +30,9 @@ const statusTone = (value) => {
   if (normalized === "in-progress") return "bg-sky-100 text-sky-700";
   return "bg-amber-100 text-amber-700";
 };
+
+const getRequestKey = (test, fallback = "") =>
+  `${String(test?.source_table || "unknown").trim()}:${String(test?.id || fallback).trim()}`;
 
 export default function LabPage() {
   const router = useRouter();
@@ -63,11 +68,12 @@ export default function LabPage() {
       const list = Array.isArray(data?.data) ? data.data : [];
       setTests(list);
 
-      if (selectedTest?.id) {
-        const refreshed = list.find((item) => String(item.id) === String(selectedTest.id));
+      if (selectedTest) {
+        const selectedKey = getRequestKey(selectedTest);
+        const refreshed = list.find((item) => getRequestKey(item) === selectedKey);
         if (refreshed) {
           setSelectedTest(refreshed);
-          setComment(refreshed.comments || "");
+          setComment(refreshed.comments || refreshed.notes || "");
         }
       }
     } catch (error) {
@@ -102,7 +108,7 @@ export default function LabPage() {
   }, [search, statusFilter, tests]);
 
   const summary = useMemo(() => {
-    const pending = tests.filter((test) => String(test?.status || "").toLowerCase() === "pending").length;
+    const pending = tests.filter((test) => ["pending", "ordered"].includes(String(test?.status || "").toLowerCase())).length;
     const completed = tests.filter((test) => String(test?.status || "").toLowerCase() === "completed").length;
     const urgent = tests.filter((test) => {
       const notes = String(test?.notes || test?.comments || "").toLowerCase();
@@ -126,7 +132,7 @@ export default function LabPage() {
 
   const openFor = (test) => {
     setSelectedTest(test);
-    setComment(test?.comments || "");
+    setComment(test?.comments || test?.notes || "");
     setFiles([]);
     setFeedback({ type: "", text: "" });
   };
@@ -153,7 +159,8 @@ export default function LabPage() {
         form.append("comment", comment.trim());
       }
 
-      const response = await apiPost(`/api/lab/update-result/${selectedTest.id}`, form, token, true);
+      const source = encodeURIComponent(String(selectedTest?.source_table || ""));
+      const response = await apiPost(`/api/lab/update-result/${selectedTest.id}?source=${source}`, form, token, true);
       if (!response?.success) {
         setFeedback({ type: "error", text: response?.message || "Failed to upload the report." });
         return;
@@ -285,12 +292,12 @@ export default function LabPage() {
                 </div>
               ) : (
                 highlightedTests.map((test, index) => {
-                  const active = String(selectedTest?.id || "") === String(test?.id || "");
+                  const active = getRequestKey(selectedTest) === getRequestKey(test);
                   const notes = String(test?.notes || test?.comments || "").trim();
 
                   return (
                     <button
-                      key={test.id || index}
+                      key={getRequestKey(test, index)}
                       type="button"
                       onClick={() => openFor(test)}
                       className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
@@ -432,7 +439,7 @@ export default function LabPage() {
                 </div>
               ) : (
                 completedPreview.map((test, index) => (
-                  <div key={test.id || index} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4">
+                  <div key={getRequestKey(test, index)} className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4">
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="font-semibold text-slate-900">{test.testName || test.test_name || "Lab Test"}</p>

@@ -339,10 +339,6 @@ async function prescriptions(patientId, hospitalId) {
     params.push(hospitalId);
   }
 
-  if (statusCol) {
-    where.push(`LOWER(COALESCE(p.\`${statusCol}\`, 'active')) = 'active'`);
-  }
-
   return query(
     `SELECT
        p.id,
@@ -746,6 +742,27 @@ async function createOrder(payload, hospitalId) {
          VALUES (${paymentInsertCols.map(() => "?").join(", ")})`,
         paymentInsertCols.map((col) => paymentValues[col])
       );
+    }
+
+    if (payload.prescription_id) {
+      const prescriptionCols = await getTableColumns("pharmacy_prescriptions");
+      const prescriptionStatusCol = firstExistingColumn(prescriptionCols || new Set(), ["status"]);
+      const prescriptionUpdatedAtCol = firstExistingColumn(prescriptionCols || new Set(), ["updated_at"]);
+
+      if (prescriptionStatusCol) {
+        const updates = [`\`${prescriptionStatusCol}\` = ?`];
+        const params = ["dispensed"];
+
+        if (prescriptionUpdatedAtCol) {
+          updates.push(`\`${prescriptionUpdatedAtCol}\` = CURRENT_TIMESTAMP`);
+        }
+
+        params.push(payload.prescription_id);
+        await connection.execute(
+          `UPDATE pharmacy_prescriptions SET ${updates.join(", ")} WHERE id = ?`,
+          params
+        );
+      }
     }
 
     await connection.commit();

@@ -7,8 +7,10 @@ const pageShell = "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(59,130,2
 const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
 
 const normalizeStatus = (value) => {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().toLowerCase();
   if (!raw) return "Unknown";
+  if (raw === "ordered") return "Pending";
+  if (raw === "final") return "Completed";
   return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
@@ -18,6 +20,9 @@ const statusTone = (value) => {
   if (normalized === "in-progress") return "bg-sky-100 text-sky-700";
   return "bg-amber-100 text-amber-700";
 };
+
+const getRequestKey = (test, fallback = "") =>
+  `${String(test?.source_table || "unknown").trim()}:${String(test?.id || fallback).trim()}`;
 
 export default function LabRequestsPage() {
   const [username, setUsername] = useState("Lab Tech");
@@ -42,6 +47,15 @@ export default function LabRequestsPage() {
       const data = await apiGet("/api/lab");
       const list = Array.isArray(data?.data) ? data.data : [];
       setTests(list);
+
+      if (selectedTest) {
+        const selectedKey = getRequestKey(selectedTest);
+        const refreshed = list.find((item) => getRequestKey(item) === selectedKey);
+        if (refreshed) {
+          setSelectedTest(refreshed);
+          setComment(refreshed.comments || refreshed.notes || "");
+        }
+      }
     } catch (error) {
       console.error("Lab requests load error:", error);
       setTests([]);
@@ -79,14 +93,14 @@ export default function LabRequestsPage() {
   const summary = useMemo(() => {
     return {
       total: tests.length,
-      pending: tests.filter((test) => String(test?.status || "").toLowerCase() === "pending").length,
+      pending: tests.filter((test) => ["pending", "ordered"].includes(String(test?.status || "").toLowerCase())).length,
       completed: tests.filter((test) => String(test?.status || "").toLowerCase() === "completed").length,
     };
   }, [tests]);
 
   const openRequest = (test) => {
     setSelectedTest(test);
-    setComment(test?.comments || "");
+    setComment(test?.comments || test?.notes || "");
     setFiles([]);
     setFeedback({ type: "", text: "" });
   };
@@ -107,7 +121,8 @@ export default function LabRequestsPage() {
       files.forEach((file) => form.append("reports", file));
       if (comment.trim()) form.append("comment", comment.trim());
 
-      const response = await apiPost(`/api/lab/update-result/${selectedTest.id}`, form, token, true);
+      const source = encodeURIComponent(String(selectedTest?.source_table || ""));
+      const response = await apiPost(`/api/lab/update-result/${selectedTest.id}?source=${source}`, form, token, true);
       if (!response?.success) {
         setFeedback({ type: "error", text: response?.message || "Failed to update lab result." });
         return;
@@ -198,11 +213,11 @@ export default function LabRequestsPage() {
               ) : (
                 filteredTests.map((test, index) => (
                   <button
-                    key={test.id || index}
+                    key={getRequestKey(test, index)}
                     type="button"
                     onClick={() => openRequest(test)}
                     className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-                      selectedTest?.id === test.id
+                      getRequestKey(selectedTest) === getRequestKey(test)
                         ? "border-sky-400 bg-sky-50"
                         : "border-slate-200 bg-slate-50/80 hover:border-sky-200 hover:bg-sky-50/60"
                     }`}

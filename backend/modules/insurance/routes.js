@@ -1,7 +1,7 @@
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const fs = require("fs");
 const controller = require("./controller");
 const authMiddleware = require("../../middleware/authMiddleware");
 const { hospitalScope } = require("../../middleware/roleMiddleware");
@@ -9,7 +9,9 @@ const { asyncHandler } = require("../../services/module.helper");
 
 const router = express.Router();
 const claimUploadDir = path.join(__dirname, "..", "..", "uploads", "claim_documents");
+const insuranceUploadDir = path.join(__dirname, "..", "..", "uploads", "insurance");
 fs.mkdirSync(claimUploadDir, { recursive: true });
+fs.mkdirSync(insuranceUploadDir, { recursive: true });
 
 const claimUpload = multer({
   storage: multer.diskStorage({
@@ -32,10 +34,6 @@ router.post("/insurance/details", asyncHandler(controller.createPatientInsurance
 router.put("/insurance/details/:id", asyncHandler(controller.updatePatientInsuranceDetail));
 router.get("/insurance/policies", asyncHandler(controller.policies));
 router.post("/insurance/policies", asyncHandler(controller.createPolicy));
-
-const insuranceUploadDir = path.join(__dirname, "..", "..", "uploads", "insurance");
-fs.mkdirSync(insuranceUploadDir, { recursive: true });
-
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, insuranceUploadDir),

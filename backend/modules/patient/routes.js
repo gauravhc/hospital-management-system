@@ -25,8 +25,8 @@ const router = express.Router();
 router.use(authMiddleware, roleMiddleware("patient"));
 
 router.get("/documents", asyncHandler(patientsController.listDocuments));
+router.get("/lab-reports", asyncHandler(patientsController.listLabReports));
 router.post("/documents", documentUpload.single("file"), asyncHandler(patientsController.uploadDocument));
 router.delete("/documents/:id", asyncHandler(patientsController.deleteDocument));
 
 module.exports = router;
-
