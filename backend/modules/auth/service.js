@@ -23,8 +23,10 @@ function normalizeAppRole(value) {
   if (role === "administrator") return "hospital_admin";
   if (role === "superadmin" || role === "super-admin") return "super_admin";
   if (role === "reception" || role === "receptionist" || role === "register") return "register";
+  if (role === "labtechnician" || role === "lab_technician" || role === "lab technician") return "lab";
   if (role === "inventorymanager" || role === "inventory_manager") return "inventory";
   if (role === "hrmanager" || role === "hr_manager" || role === "hr manager") return "hr";
+  if (role === "insurance_manager" || role === "insurance manager" || role === "insurancemanager") return "insurance";
   return role;
 }
 

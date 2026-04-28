@@ -24,6 +24,7 @@ const reportRoutes = require("../modules/reports/routes");
 const hrRoutes = require("../modules/hr/routes");
 const taskRoutes = require("../modules/tasks/routes");
 const notificationRoutes = require("../modules/notifications/routes");
+const receptionRoutes = require("../modules/reception/routes");
 const legacyCompatRoutes = require("./legacyCompat.routes");
 
 const router = express.Router();
@@ -53,6 +54,7 @@ router.use("/reports", reportRoutes);
 router.use("/hr", hrRoutes);
 router.use("/tasks", taskRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/reception", receptionRoutes);
 
 // Insurance module mounts at /claims and /insurance/policies
 router.use("/", insuranceRoutes);

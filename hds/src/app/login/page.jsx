@@ -20,6 +20,7 @@ const normalizeRole = (value) => {
     return "register";
   }
   if (rawRole === "labtechnician" || rawRole === "lab_technician") return "lab";
+  if (rawRole === "insurance" || rawRole === "insurance_manager" || rawRole === "insurancemanager") return "insurance";
   if (rawRole === "inventorymanager" || rawRole === "inventory_manager" || rawRole === "inventory") return "inventory";
   if (rawRole === "hrmanager" || rawRole === "hr_manager" || rawRole === "hr") return "hr";
 
@@ -97,6 +98,9 @@ export default function LoginPage() {
           break;
         case "hr":
           router.replace("/hr");
+          break;
+        case "insurance":
+          router.replace("/insurance");
           break;
         default:
           router.replace("/");

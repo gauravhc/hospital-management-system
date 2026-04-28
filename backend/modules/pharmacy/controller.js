@@ -22,9 +22,25 @@ async function createPrescription(req, res) {
   };
   return ok(res, await service.createPrescription(payload, getScopedHospitalId(req), req.user || null), "Prescription created", 201);
 }
-async function prescriptions(req, res) { return ok(res, await service.prescriptions(req.params.patientId, getScopedHospitalId(req))); }
+async function listPrescriptions(req, res) { return ok(res, await service.listPrescriptions(getScopedHospitalId(req), req.query || {})); }
+async function prescriptions(req, res) {
+  const requestedPatientId = req.params.patientId;
+  if (String(req.user?.role || "").toLowerCase().trim() === "patient" && String(requestedPatientId) !== String(req.user?.id)) {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+  return ok(res, await service.prescriptions(requestedPatientId, getScopedHospitalId(req)));
+}
 async function orders(req, res) { return ok(res, await service.orders(getScopedHospitalId(req))); }
 async function createOrder(req, res) { return ok(res, await service.createOrder(req.body, getScopedHospitalId(req)), "Order created", 201); }
 async function sales(req, res) { return ok(res, await service.sales(getScopedHospitalId(req))); }
+async function updateStock(req, res) {
+  const body = req.body || {};
+  const id = body.id || body.medicine_id || body.medicineId;
+  if (!id) {
+    return res.status(400).json({ success: false, message: "medicine id is required" });
+  }
+  await service.updateMedicine(id, body);
+  return ok(res, null, "Stock updated");
+}
 
-module.exports = { medicines, createMedicine, updateMedicine, removeMedicine, createPrescription, prescriptions, orders, createOrder, sales };
+module.exports = { medicines, createMedicine, updateMedicine, removeMedicine, createPrescription, listPrescriptions, prescriptions, orders, createOrder, sales, updateStock };

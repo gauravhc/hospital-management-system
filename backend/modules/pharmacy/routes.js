@@ -4,7 +4,7 @@ const path = require("path");
 const multer = require("multer");
 const controller = require("./controller");
 const authMiddleware = require("../../middleware/authMiddleware");
-const { hospitalScope } = require("../../middleware/roleMiddleware");
+const { hospitalScope, roleMiddleware } = require("../../middleware/roleMiddleware");
 const { asyncHandler } = require("../../services/module.helper");
 
 const router = express.Router();
@@ -22,14 +22,22 @@ const upload = multer({
 
 router.use(authMiddleware, hospitalScope);
 
-router.get("/medicines", asyncHandler(controller.medicines));
-router.post("/medicines", asyncHandler(controller.createMedicine));
-router.put("/medicines/:id", asyncHandler(controller.updateMedicine));
-router.delete("/medicines/:id", asyncHandler(controller.removeMedicine));
-router.post("/prescriptions", upload.single("prescription_image"), asyncHandler(controller.createPrescription));
-router.get("/prescriptions/:patientId", asyncHandler(controller.prescriptions));
-router.get("/orders", asyncHandler(controller.orders));
-router.post("/orders", asyncHandler(controller.createOrder));
-router.get("/sales", asyncHandler(controller.sales));
+router.get("/medicines", roleMiddleware("pharmacist", "doctor", "hospital_admin", "super_admin"), asyncHandler(controller.medicines));
+router.post("/medicines", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.createMedicine));
+router.put("/medicines/:id", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.updateMedicine));
+router.delete("/medicines/:id", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.removeMedicine));
+
+router.post("/prescriptions", roleMiddleware("doctor", "pharmacist", "hospital_admin", "super_admin"), upload.single("prescription_image"), asyncHandler(controller.createPrescription));
+router.get("/prescriptions", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.listPrescriptions));
+router.get("/prescriptions/:patientId", roleMiddleware("patient", "doctor", "pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.prescriptions));
+
+router.get("/orders", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.orders));
+router.post("/orders", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.createOrder));
+// Alias for dispensing flow
+router.post("/dispense", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.createOrder));
+// Alias for stock updates
+router.put("/stock", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.updateStock));
+
+router.get("/sales", roleMiddleware("pharmacist", "hospital_admin", "super_admin"), asyncHandler(controller.sales));
 
 module.exports = router;

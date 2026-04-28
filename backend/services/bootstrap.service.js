@@ -1,6 +1,15 @@
 const { query } = require("../config/database");
 const { getSchemaMode } = require("./schemaMode.service");
 const { getTableColumns, clearTableColumnsCache } = require("./dbMeta");
+const bcrypt = require("bcryptjs");
+
+function firstExistingColumn(cols, candidates = []) {
+  if (!cols) return null;
+  for (const candidate of candidates) {
+    if (cols.has(candidate)) return candidate;
+  }
+  return null;
+}
 
 function sanitizeCrossDatabaseForeignKeys(statement) {
   let sql = String(statement || "");
@@ -1249,6 +1258,66 @@ async function ensurePatientAgeColumn() {
   }
 }
 
+async function ensureDefaultSystemUsers() {
+  try {
+    const staffCols = await getTableColumns("staff");
+    if (!staffCols) return;
+
+    const emailCol = firstExistingColumn(staffCols, ["email"]);
+    const passwordCol = firstExistingColumn(staffCols, ["password", "password_hash"]);
+    const roleCol = firstExistingColumn(staffCols, ["role"]);
+    if (!emailCol || !passwordCol || !roleCol) return;
+
+    const nameCol = firstExistingColumn(staffCols, ["name", "full_name"]);
+    const phoneCol = firstExistingColumn(staffCols, ["phone", "mobile"]);
+    const hospitalCol = firstExistingColumn(staffCols, ["hospital_id"]);
+    const statusCol = firstExistingColumn(staffCols, ["status"]);
+
+    const hospitalRows = await query(`SELECT id FROM hospitals ORDER BY id ASC LIMIT 1`);
+    const defaultHospitalId = hospitalRows?.[0]?.id ?? null;
+
+    const defaults = [
+      { role: "reception", email: "reception@hds.com", password: "123456", name: "Receptionist", phone: "9999999990" },
+      { role: "labtechnician", email: "lab@hds.com", password: "123456", name: "Lab Technician", phone: "9999999991" },
+      { role: "pharmacist", email: "pharmacy@hds.com", password: "123456", name: "Pharmacist", phone: "9999999992" },
+      { role: "accountant", email: "accounts@hds.com", password: "123456", name: "Accountant", phone: "9999999993" },
+      { role: "hrmanager", email: "hr@hds.com", password: "123456", name: "HR Manager", phone: "9999999994" },
+      { role: "insurance", email: "insurance@hds.com", password: "123456", name: "Insurance Manager", phone: "9999999995" },
+      { role: "inventorymanager", email: "inventory@hds.com", password: "123456", name: "Inventory Manager", phone: "9999999996" },
+    ];
+
+    for (const user of defaults) {
+      const safeEmail = String(user.email || "").trim().toLowerCase();
+      if (!safeEmail) continue;
+
+      const existing = await query(
+        `SELECT 1 FROM staff WHERE LOWER(\`${emailCol}\`) = ? LIMIT 1`,
+        [safeEmail]
+      );
+      if (existing?.length) continue;
+
+      const values = {};
+      values[emailCol] = safeEmail;
+      values[passwordCol] = await bcrypt.hash(String(user.password || "123456"), 10);
+      values[roleCol] = user.role;
+
+      if (nameCol) values[nameCol] = user.name;
+      if (phoneCol) values[phoneCol] = user.phone || null;
+      if (hospitalCol) values[hospitalCol] = defaultHospitalId;
+      if (statusCol) values[statusCol] = "active";
+
+      const cols = Object.keys(values);
+      await query(
+        `INSERT INTO staff (${cols.map((c) => `\`${c}\``).join(", ")})
+         VALUES (${cols.map(() => "?").join(", ")})`,
+        cols.map((c) => values[c])
+      );
+    }
+  } catch (err) {
+    console.warn("ensureDefaultSystemUsers skipped:", err?.message || err);
+  }
+}
+
 async function ensureErpSchema() {
   const mode = await getSchemaMode();
 
@@ -1303,6 +1372,7 @@ async function ensureErpSchema() {
     await ensurePatientInsuranceTable();
     await ensureLabTestExtensions();
     await ensurePatientAgeColumn();
+    await ensureDefaultSystemUsers();
     return;
   }
 

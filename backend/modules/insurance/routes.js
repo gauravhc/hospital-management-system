@@ -4,7 +4,7 @@ const multer = require("multer");
 const fs = require("fs");
 const controller = require("./controller");
 const authMiddleware = require("../../middleware/authMiddleware");
-const { hospitalScope } = require("../../middleware/roleMiddleware");
+const { hospitalScope, roleMiddleware } = require("../../middleware/roleMiddleware");
 const { asyncHandler } = require("../../services/module.helper");
 
 const router = express.Router();
@@ -25,15 +25,16 @@ const claimUpload = multer({
 
 router.use(authMiddleware, hospitalScope);
 
-router.get("/claims", asyncHandler(controller.claims));
-router.post("/claims", claimUpload.single("attachment"), asyncHandler(controller.createClaim));
-router.put("/claims/:id", asyncHandler(controller.updateClaim));
-router.get("/insurance/details", asyncHandler(controller.patientInsuranceDetails));
-router.get("/insurance/details/:patientId", asyncHandler(controller.patientInsuranceDetails));
-router.post("/insurance/details", asyncHandler(controller.createPatientInsuranceDetail));
-router.put("/insurance/details/:id", asyncHandler(controller.updatePatientInsuranceDetail));
-router.get("/insurance/policies", asyncHandler(controller.policies));
-router.post("/insurance/policies", asyncHandler(controller.createPolicy));
+router.get("/claims", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.claims));
+router.post("/claims", roleMiddleware("insurance", "hospital_admin", "super_admin"), claimUpload.single("attachment"), asyncHandler(controller.createClaim));
+router.put("/claims/:id", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.updateClaim));
+
+router.get("/insurance/details", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.patientInsuranceDetails));
+router.get("/insurance/details/:patientId", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.patientInsuranceDetails));
+router.post("/insurance/details", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.createPatientInsuranceDetail));
+router.put("/insurance/details/:id", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.updatePatientInsuranceDetail));
+router.get("/insurance/policies", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.policies));
+router.post("/insurance/policies", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.createPolicy));
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, insuranceUploadDir),
@@ -62,5 +63,9 @@ router.post(
   asyncHandler(controller.createPatientInsurance)
 );
 router.get("/insurance/:patientId", asyncHandler(controller.getPatientInsurance));
+// Aliases expected by role-based insurance flows
+router.post("/insurance/add", upload.fields([{ name: "aadhaar_photo", maxCount: 1 }, { name: "pan_photo", maxCount: 1 }, { name: "insurance_card_photo", maxCount: 1 }]), asyncHandler(controller.createPatientInsurance));
+router.get("/insurance/claims", roleMiddleware("insurance", "hospital_admin", "super_admin"), asyncHandler(controller.claims));
+router.post("/insurance/claim", roleMiddleware("insurance", "hospital_admin", "super_admin"), claimUpload.single("attachment"), asyncHandler(controller.createClaim));
 
 module.exports = router;

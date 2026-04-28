@@ -11,6 +11,7 @@ const ROLE_TABLE_MAP = {
   register: ["staff", "receptionists"],
   admin: ["staff"],
   pharmacist: ["staff"],
+  insurance: ["staff"],
   lab: ["staff"],
   labtechnician: ["staff"],
   inventory: ["staff"],
@@ -26,6 +27,7 @@ function normalizeSessionRole(value) {
   if (role === "labtechnician" || role === "lab_technician" || role === "lab technician") return "lab";
   if (role === "inventorymanager" || role === "inventory_manager") return "inventory";
   if (role === "hrmanager" || role === "hr_manager" || role === "hr manager") return "hr";
+  if (role === "insurance_manager" || role === "insurance manager" || role === "insurancemanager") return "insurance";
   if (role === "superadmin" || role === "super-admin") return "super_admin";
   if (role === "administrator") return "hospital_admin";
   return role;

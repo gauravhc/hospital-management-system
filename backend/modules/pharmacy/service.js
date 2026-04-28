@@ -360,7 +360,9 @@ async function prescriptions(patientId, hospitalId) {
        pm.expiry_date
      FROM pharmacy_prescriptions p
      LEFT JOIN pharmacy_prescription_items pi ON pi.\`${itemPrescriptionCol}\` = p.id
-     LEFT JOIN pharmacy_medicines pm ON pm.id = ${itemMedicineUuidCol ? `pi.\`${itemMedicineUuidCol}\`` : itemMedicineCol ? `CAST(pi.\`${itemMedicineCol}\` AS CHAR)` : "NULL"}
+     LEFT JOIN pharmacy_medicines pm
+       ON CAST(pm.id AS CHAR) COLLATE utf8mb4_general_ci =
+          CAST(${itemMedicineUuidCol ? `pi.\`${itemMedicineUuidCol}\`` : itemMedicineCol ? `CAST(pi.\`${itemMedicineCol}\` AS CHAR)` : "NULL"} AS CHAR) COLLATE utf8mb4_general_ci
      WHERE ${where.join(" AND ")}
      ORDER BY p.created_at DESC, pi.id ASC`,
     params
@@ -536,7 +538,9 @@ async function orders(hospitalId) {
        ${orderDateCol ? `po.\`${orderDateCol}\`` : "NULL"} AS created_at
      FROM pharmacy_orders po
      LEFT JOIN pharmacy_order_items poi ON poi.order_id = po.id
-     LEFT JOIN pharmacy_medicines pm ON pm.id = ${orderItemMedicineUuidCol ? `poi.\`${orderItemMedicineUuidCol}\`` : orderItemMedicineCol ? `CAST(poi.\`${orderItemMedicineCol}\` AS CHAR)` : "NULL"}
+     LEFT JOIN pharmacy_medicines pm
+       ON CAST(pm.id AS CHAR) COLLATE utf8mb4_general_ci =
+          CAST(${orderItemMedicineUuidCol ? `poi.\`${orderItemMedicineUuidCol}\`` : orderItemMedicineCol ? `CAST(poi.\`${orderItemMedicineCol}\` AS CHAR)` : "NULL"} AS CHAR) COLLATE utf8mb4_general_ci
      LEFT JOIN patients p ON p.id = po.patient_id
      LEFT JOIN doctors d ON d.id = po.doctor_id
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
@@ -799,6 +803,53 @@ async function createOrder(payload, hospitalId) {
   }
 }
 
+async function listPrescriptions(hospitalId, filters = {}) {
+  const prescriptionCols = await getTableColumns("pharmacy_prescriptions");
+  if (!prescriptionCols) return [];
+
+  const hospitalCol = firstExistingColumn(prescriptionCols, ["hospital_id"]);
+  const patientCol = firstExistingColumn(prescriptionCols, ["patient_id"]);
+  const statusCol = firstExistingColumn(prescriptionCols, ["status"]);
+  const createdAtCol = firstExistingColumn(prescriptionCols, ["created_at", "updated_at", "id"]);
+
+  const where = [];
+  const params = [];
+
+  if (hospitalId && hospitalCol) {
+    where.push(`pp.\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  const patientIdFilter = filters.patient_id || filters.patientId;
+  if (patientIdFilter && patientCol) {
+    where.push(`pp.\`${patientCol}\` = ?`);
+    params.push(patientIdFilter);
+  }
+
+  if (filters.status && statusCol) {
+    where.push(`LOWER(pp.\`${statusCol}\`) = ?`);
+    params.push(String(filters.status).toLowerCase());
+  }
+
+  const patientCols = await getTableColumns("patients");
+  const patientNameExpr = await getNameExpr("patients", "p", ["full_name", "name"]);
+
+  const joinSql = patientCols && patientCol
+    ? `LEFT JOIN patients p ON p.id = pp.\`${patientCol}\``
+    : "";
+
+  return query(
+    `SELECT
+       pp.*
+       ${joinSql ? `, ${patientNameExpr} AS patient_name` : ""}
+     FROM pharmacy_prescriptions pp
+     ${joinSql}
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY ${createdAtCol ? `pp.\`${createdAtCol}\`` : "pp.id"} DESC`,
+    params
+  );
+}
+
 async function sales(hospitalId) {
   const hospitalCol = await getHospitalColumn("pharmacy_orders");
   const orderCols = await getTableColumns("pharmacy_orders");
@@ -828,7 +879,9 @@ async function sales(hospitalId) {
        ${orderStatusCol ? `po.\`${orderStatusCol}\`` : "'pending'"} AS status
      FROM pharmacy_orders po
      LEFT JOIN pharmacy_order_items poi ON poi.order_id = po.id
-     LEFT JOIN pharmacy_medicines pm ON pm.id = ${orderItemMedicineUuidCol ? `poi.\`${orderItemMedicineUuidCol}\`` : orderItemMedicineCol ? `CAST(poi.\`${orderItemMedicineCol}\` AS CHAR)` : "NULL"}
+     LEFT JOIN pharmacy_medicines pm
+       ON CAST(pm.id AS CHAR) COLLATE utf8mb4_general_ci =
+          CAST(${orderItemMedicineUuidCol ? `poi.\`${orderItemMedicineUuidCol}\`` : orderItemMedicineCol ? `CAST(poi.\`${orderItemMedicineCol}\` AS CHAR)` : "NULL"} AS CHAR) COLLATE utf8mb4_general_ci
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ORDER BY ${orderDateCol ? `po.\`${orderDateCol}\`` : "po.id"} DESC, po.id DESC`,
     params
@@ -841,6 +894,7 @@ module.exports = {
   updateMedicine,
   removeMedicine,
   createPrescription,
+  listPrescriptions,
   prescriptions,
   orders,
   createOrder,
