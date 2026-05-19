@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { apiPost } from "@/services/api";
 import { LAB_TEST_CATEGORIES, LAB_TESTS_FLAT } from "@/data/labTests";
 
 export default function PatientLabOrderPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = null;
 
   const [processing, setProcessing] = useState(false);
   const [booked, setBooked] = useState(false);

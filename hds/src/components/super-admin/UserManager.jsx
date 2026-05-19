@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Edit, Loader2, Plus, Power, Search, Shield, Trash2, X } from "lucide-react";
 
 import { apiDelete, apiGet, apiPut } from "@/services/api";
@@ -37,9 +37,9 @@ const formatRole = (value) =>
 
 export default function SuperAdminUserManager() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialRole = (searchParams.get("role") || "all").toLowerCase();
-  const hospitalIdParam = searchParams.get("hospital_id") || "";
+  const searchParams = null;
+  const initialRole = (searchParams?.get?.("role") || "all").toLowerCase();
+  const hospitalIdParam = searchParams?.get?.("hospital_id") || "";
 
   const [users, setUsers] = useState([]);
   const [hospitals, setHospitals] = useState([]);

@@ -6,7 +6,7 @@ import {
     Shield, CheckCircle, XCircle
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
@@ -46,8 +46,8 @@ const hospitalRoles = [
 
 export default function UserList() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const initialRole = searchParams.get("role") || "All";
+    const searchParams = null;
+    const initialRole = searchParams?.get?.("role") || "All";
 
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);

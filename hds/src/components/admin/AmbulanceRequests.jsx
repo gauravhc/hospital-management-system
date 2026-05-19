@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { apiGet, apiPost, apiPut } from "@/services/api";
 
 const toLower = (v) => String(v || "").toLowerCase();
@@ -24,7 +24,7 @@ const AMBULANCE_TYPE_OPTIONS = [
 
 export default function AmbulanceRequests() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = null;
   const [statusFilter, setStatusFilter] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [ambulances, setAmbulances] = useState([]);
