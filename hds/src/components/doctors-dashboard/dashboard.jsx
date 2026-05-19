@@ -19,7 +19,7 @@ import {
   ClipboardList
 } from "lucide-react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+import { API_BASE_URL } from "@/lib/apiBaseUrl";
 
 function buildAvatarUrl(raw) {
   if (!raw) return "";
@@ -525,7 +525,7 @@ export default function DoctorPage() {
           <div className="p-5">
             {nurseTasksError ? (
               <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-                {nurseTasksError} (Make sure the `backend/` server is running on `NEXT_PUBLIC_API_BASE_URL` and not `hds/app.js`.)
+                {nurseTasksError} (Make sure the `backend/` server is running on `NEXT_PUBLIC_API_URL` and not `hds/app.js`.)
               </div>
             ) : null}
 

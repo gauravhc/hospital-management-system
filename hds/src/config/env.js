@@ -14,7 +14,7 @@ export const config = {
         url: getEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'),
     },
     api: {
-        baseUrl: getEnv('NEXT_PUBLIC_API_BASE_URL', API_BASE_URL),
+        baseUrl: getEnv('NEXT_PUBLIC_API_URL', API_BASE_URL),
         timeout: 10000,
     },
     endpoints: {

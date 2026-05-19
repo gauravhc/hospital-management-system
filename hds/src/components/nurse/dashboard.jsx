@@ -5,13 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiGet, apiPost, apiPut } from "@/services/api";
 import { Activity, CheckCircle, ClipboardList, Clock, FileText } from "lucide-react";
+import { API_BASE_URL as backendBase } from "@/lib/apiBaseUrl";
 
 const statusOf = (value) => String(value || "").trim().toLowerCase();
 const priorityOf = (value) => String(value || "medium").trim().toLowerCase();
 const assignedNurseOf = (task) =>
   String(task?.assigned_nurse_id || task?.assignedNurseId || task?.nurse_id || task?.nurseId || "").trim();
-
-const backendBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
 function resolveImageUrl(value) {
   if (!value) return "";

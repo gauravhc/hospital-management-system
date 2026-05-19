@@ -5,7 +5,7 @@ import { Loader2, ShieldCheck, UploadCloud } from "lucide-react";
 
 import { apiGet, apiPost } from "@/services/api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+import { API_BASE_URL } from "@/lib/apiBaseUrl";
 
 const inputClass =
   "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";

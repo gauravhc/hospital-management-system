@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiGet } from "@/services/api";
-
-const backendBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+import { API_BASE_URL as backendBase } from "@/lib/apiBaseUrl";
 
 function resolveImageUrl(value) {
   if (!value) return "";
@@ -107,4 +106,3 @@ export default function NurseProfilePage() {
     </div>
   );
 }
-

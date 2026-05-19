@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import apiClient from "@/lib/apiClient";
-const BACKEND_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+import backendUrl from "@/lib/backendUrl";
 
 const STATUS_OPTIONS = ["scheduled", "completed", "cancelled"];
 
@@ -29,7 +29,7 @@ export default function DoctorAppointmentsPage() {
     setLoading(true);
     setError("");
     try {
-      const { data } = await apiClient.get(`${BACKEND_BASE}/api/appointments/doctor/${doctorId}`);
+      const { data } = await apiClient.get(backendUrl(`/api/appointments/doctor/${doctorId}`));
       setAppointments(Array.isArray(data?.appointments) ? data.appointments : []);
     } catch (err) {
       setError(err?.message || "Failed to fetch appointments.");
@@ -41,7 +41,7 @@ export default function DoctorAppointmentsPage() {
 
   const updateStatus = async (appointmentId, status) => {
     try {
-      const { data } = await apiClient.put(`${BACKEND_BASE}/api/appointments/status/${appointmentId}`, { status });
+      const { data } = await apiClient.put(backendUrl(`/api/appointments/status/${appointmentId}`), { status });
       if (data?.success) {
         setAppointments((prev) =>
           prev.map((a) => (String(a.id) === String(appointmentId) ? { ...a, status } : a))

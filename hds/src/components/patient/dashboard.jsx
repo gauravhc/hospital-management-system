@@ -7,7 +7,7 @@ import { Calendar, ShieldCheck, ShoppingCart, TestTube, Truck, User } from "luci
 
 import { apiGet } from "@/services/api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+import { API_BASE_URL } from "@/lib/apiBaseUrl";
 
 const vitals = {
   bloodPressure: "118/76 mmHg",

@@ -7,11 +7,11 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+import { API_BASE_URL as API_URL_BASE } from "@/lib/apiBaseUrl";
 
 const apiLocal = async (url, { method = "GET", body } = {}) => {
-    const finalUrl = String(url || "").startsWith("http") ? url : `${API_BASE_URL}${url}`;
+    const rawUrl = String(url || "");
+    const finalUrl = rawUrl.startsWith("http") ? rawUrl : API_URL_BASE ? `${API_URL_BASE}${rawUrl}` : rawUrl;
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
     const headers = {};
