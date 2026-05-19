@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const cors = require('cors');
+const cors = require("cors");
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -24,10 +24,15 @@ app.use(
   })
 );
 
-app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://hospital-management-system-sigma-gules.vercel.app"
+    ],
+    credentials: true,
+  })
+);
 
 // ✅ Rate limit
 const limiter = rateLimit({
