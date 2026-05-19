@@ -18,6 +18,20 @@ export const AuthProvider = ({ children }) => {
 
   const loading = false;
 
+  const setCookie = (name, value, { expires, path = "/", sameSite = "Lax" } = {}) => {
+    if (typeof document === "undefined") return;
+    const parts = [`${name}=${encodeURIComponent(value)}`, `path=${path}`, `SameSite=${sameSite}`];
+    if (expires) parts.push(`expires=${expires.toUTCString()}`);
+    try {
+      if (typeof window !== "undefined" && window.location?.protocol === "https:") {
+        parts.push("Secure");
+      }
+    } catch {
+      // ignore
+    }
+    document.cookie = parts.join("; ");
+  };
+
   const login = ({
     token,
     role,
@@ -49,7 +63,15 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("id", id ? String(id) : "");
     localStorage.setItem("hospital_id", hospitalId ? String(hospitalId) : "");
 
-    document.cookie = `token=${token}; path=/`;
+    setCookie("token", token);
+    setCookie("role", role || "");
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[auth] stored token:", Boolean(token));
+      // eslint-disable-next-line no-console
+      console.log("[auth] stored role:", role || "");
+    }
     emitAuthChange();
   };
 
@@ -61,7 +83,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("id");
     localStorage.removeItem("hospital_id");
 
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    const expired = new Date(0);
+    setCookie("token", "", { expires: expired });
+    setCookie("role", "", { expires: expired });
     emitAuthChange();
     window.location.href = "/login";
   };
@@ -74,4 +98,3 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-

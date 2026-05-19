@@ -32,6 +32,7 @@ export async function middleware(request) {
   if (!protectedRoute) return NextResponse.next();
 
   const token = request.cookies.get("token")?.value;
+  const roleCookie = request.cookies.get("role")?.value;
 
   if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -39,8 +40,14 @@ export async function middleware(request) {
 
   try {
     const secretValue = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET;
+    // In production (e.g. Vercel), we typically do not have access to the backend JWT secret.
+    // If the secret is missing, fall back to role cookie checks only (backend still enforces auth).
     if (!secretValue) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      const allowedRoles = PROTECTED_ROUTES[protectedRoute];
+      if (roleCookie && !allowedRoles.includes(String(roleCookie))) {
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+      return NextResponse.next();
     }
 
     const secret = new TextEncoder().encode(secretValue);

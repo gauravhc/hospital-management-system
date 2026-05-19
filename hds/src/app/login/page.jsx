@@ -47,11 +47,46 @@ export default function LoginPage() {
         password,
       });
 
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[login] response:", response);
+      }
+
       if (!response?.token || !response?.user) {
         throw new Error("Invalid login response");
       }
 
       const normalizedRole = normalizeRole(response.user.role);
+      const redirectPath = (() => {
+        switch (normalizedRole) {
+          case "super_admin":
+            return "/super-admin";
+          case "hospital_admin":
+            return "/admin";
+          case "doctor":
+            return "/doctor";
+          case "lab":
+            return "/lab";
+          case "pharmacist":
+            return "/pharmacy";
+          case "nurse":
+            return "/nurse";
+          case "patient":
+            return "/patient";
+          case "inventory":
+            return "/inventory";
+          case "register":
+            return "/register";
+          case "accountant":
+            return "/accountant";
+          case "hr":
+            return "/hr";
+          case "insurance":
+            return "/insurance";
+          default:
+            return "/";
+        }
+      })();
 
       login({
         token: response.token,
@@ -65,46 +100,18 @@ export default function LoginPage() {
         profile_image_url: response.user.profile_image_url,
       });
 
-      switch (normalizedRole) {
-        case "super_admin":
-          router.replace("/super-admin");
-          break;
-        case "hospital_admin":
-          router.replace("/admin");
-          break;
-        case "doctor":
-          router.replace("/doctor");
-          break;
-        case "lab":
-          router.replace("/lab");
-          break;
-        case "pharmacist":
-          router.replace("/pharmacy");
-          break;
-        case "nurse":
-          router.replace("/nurse");
-          break;
-        case "patient":
-          router.replace("/patient");
-          break;
-        case "inventory":
-          router.replace("/inventory");
-          break;
-        case "register":
-          router.replace("/register");
-          break;
-        case "accountant":
-          router.replace("/accountant");
-          break;
-        case "hr":
-          router.replace("/hr");
-          break;
-        case "insurance":
-          router.replace("/insurance");
-          break;
-        default:
-          router.replace("/");
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[login] normalized role:", normalizedRole);
+        // eslint-disable-next-line no-console
+        console.log("[login] token stored:", Boolean(localStorage.getItem("token")));
+        // eslint-disable-next-line no-console
+        console.log("[login] role stored:", localStorage.getItem("role"));
+        // eslint-disable-next-line no-console
+        console.log("[login] redirect path:", redirectPath);
       }
+
+      router.replace(redirectPath);
     } catch (err) {
       console.error("Login Error:", err);
       setMessage(
