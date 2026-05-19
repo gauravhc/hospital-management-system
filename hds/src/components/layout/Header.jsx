@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from "next/image";
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Menu, X, Phone, Mail, Clock, Lock, User, LogOut, ArrowRight } from 'lucide-react';
@@ -10,6 +11,21 @@ const Header = () => {
     const pathname = usePathname();
     const [isScrolled, setIsScrolled] = useState(false);
     const { user, logout } = useAuth();
+
+    const LOGO_SRC = "/logo.png";
+    const isDashboardRoute =
+        pathname?.startsWith("/patient") ||
+        pathname?.startsWith("/doctor") ||
+        pathname?.startsWith("/admin") ||
+        pathname?.startsWith("/super-admin") ||
+        pathname?.startsWith("/inventory") ||
+        pathname?.startsWith("/register") ||
+        pathname?.startsWith("/lab") ||
+        pathname?.startsWith("/nurse") ||
+        pathname?.startsWith("/pharmacy") ||
+        pathname?.startsWith("/accountant") ||
+        pathname?.startsWith("/hr") ||
+        pathname?.startsWith("/insurance");
 
     useEffect(() => {
         const handleScroll = () => {
@@ -101,10 +117,33 @@ const Header = () => {
                     <div className="flex justify-between items-center h-20">
                         {/* Logo */}
                         <div className="flex-shrink-0 flex items-center">
-                            <Link href="/" className="flex items-center gap-2">
-                                <span className="font-bold text-2xl text-[#1B2559] flex items-center gap-2">
-                                    <span className="text-[#0E82FD] text-3xl leading-none">+</span> Medicore vault
-                                </span>
+                            <Link href="/" className="flex items-center h-full">
+                                {isDashboardRoute ? (
+                                    <span className="font-bold text-2xl text-[#1B2559] flex items-center gap-2">
+                                        <Image
+                                            src={LOGO_SRC}
+                                            alt="Medicore Vault"
+                                            width={64}
+                                            height={64}
+                                            className="w-[64px] h-[64px] object-contain"
+                                            priority
+                                            sizes="64px"
+                                            unoptimized
+                                        />
+                                        Medicore vault
+                                    </span>
+                                ) : (
+                                    <Image
+                                        src={LOGO_SRC}
+                                        alt="Medicore Vault - Secure Care, Limitless Trust"
+                                        width={180}
+                                        height={70}
+                                        className="block w-auto h-16 sm:h-[4.5rem] max-w-[56vw] sm:max-w-none object-contain object-left"
+                                        priority
+                                        sizes="(max-width: 640px) 185px, (max-width: 1024px) 210px, 235px"
+                                        unoptimized
+                                    />
+                                )}
                             </Link>
                         </div>
 

@@ -34,6 +34,38 @@ function normalizeTests(value) {
     .filter(Boolean);
 }
 
+function normalizeNote(value) {
+  const raw = value === null || value === undefined ? "" : String(value);
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return trimmed.length > 5000 ? trimmed.slice(0, 5000) : trimmed;
+}
+
+async function updateNurseNotesIfProvided({ cols, taskId, hospitalId, nurseId, notes }) {
+  const notesCol = firstExistingColumn(cols, ["nurse_notes"]);
+  if (!notesCol) return;
+
+  const safeNotes = normalizeNote(notes);
+  if (!safeNotes) return;
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  const nurseCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+  if (!idCol || !nurseCol) return;
+
+  const where = [`\`${idCol}\` = ?`, `\`${nurseCol}\` = ?`];
+  const params = [taskId, nurseId];
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  await query(
+    `UPDATE nurse_tasks SET \`${notesCol}\` = ? WHERE ${where.join(" AND ")}`,
+    [safeNotes, ...params]
+  );
+}
+
 async function pickDefaultAssigneeId(hospitalId) {
   if (!hospitalId) return null;
   const cols = await getTableColumns("nurses");
@@ -136,7 +168,7 @@ async function getTaskById(taskId, hospitalId) {
   return rows[0] || null;
 }
 
-async function acceptTask({ taskId, hospitalId, nurseId }) {
+async function acceptTask({ taskId, hospitalId, nurseId, notes = null }) {
   const cols = await getTableColumns("nurse_tasks");
   if (!cols) throw new Error("nurse_tasks table not found");
 
@@ -208,10 +240,11 @@ async function acceptTask({ taskId, hospitalId, nurseId }) {
     throw err;
   }
 
+  await updateNurseNotesIfProvided({ cols, taskId, hospitalId, nurseId, notes });
   return getTaskById(taskId, hospitalId);
 }
 
-async function startTask({ taskId, hospitalId, nurseId }) {
+async function startTask({ taskId, hospitalId, nurseId, notes = null }) {
   const cols = await getTableColumns("nurse_tasks");
   if (!cols) throw new Error("nurse_tasks table not found");
 
@@ -253,10 +286,11 @@ async function startTask({ taskId, hospitalId, nurseId }) {
     params
   );
 
+  await updateNurseNotesIfProvided({ cols, taskId, hospitalId, nurseId, notes });
   return getTaskById(taskId, hospitalId);
 }
 
-async function completeTask({ taskId, hospitalId, nurseId }) {
+async function completeTask({ taskId, hospitalId, nurseId, notes = null }) {
   const cols = await getTableColumns("nurse_tasks");
   if (!cols) throw new Error("nurse_tasks table not found");
 
@@ -298,6 +332,7 @@ async function completeTask({ taskId, hospitalId, nurseId }) {
     params
   );
 
+  await updateNurseNotesIfProvided({ cols, taskId, hospitalId, nurseId, notes });
   return getTaskById(taskId, hospitalId);
 }
 
@@ -311,47 +346,102 @@ async function listPlansByPatient({ hospitalId, patientId, assignedBy = null } =
 
   const createdAtCol = firstExistingColumn(cols, ["created_at", "createdAt"]);
   const titleCol = firstExistingColumn(cols, ["task_title", "title"]);
-  const descriptionCol = firstExistingColumn(cols, ["description", "notes"]);
+  const descriptionCol = firstExistingColumn(cols, ["description"]);
+  const nurseNotesCol = firstExistingColumn(cols, ["nurse_notes"]);
   const treatmentCol = firstExistingColumn(cols, ["treatment"]);
   const testsCol = firstExistingColumn(cols, ["tests"]);
   const priorityCol = firstExistingColumn(cols, ["priority"]);
   const statusCol = firstExistingColumn(cols, ["status"]);
   const assignedByCol = firstExistingColumn(cols, ["assigned_by", "assignedBy"]);
+  const nurseIdCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
   const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
 
+  const nursesCols = await getTableColumns("nurses");
+  const nurseIdJoinCol = nursesCols ? firstExistingColumn(nursesCols, ["id", "nurse_id", "user_id"]) : null;
+  const nurseUserIdCol = nursesCols ? firstExistingColumn(nursesCols, ["user_id"]) : null;
+  const nurseNameCol = nursesCols ? firstExistingColumn(nursesCols, ["full_name", "name"]) : null;
+  const nurseFirstNameCol = nursesCols ? firstExistingColumn(nursesCols, ["first_name"]) : null;
+  const nurseLastNameCol = nursesCols ? firstExistingColumn(nursesCols, ["last_name"]) : null;
+  const nurseEmailCol = nursesCols ? firstExistingColumn(nursesCols, ["email"]) : null;
+
+  const usersCols = nurseUserIdCol ? await getTableColumns("users") : null;
+  const userIdCol = usersCols ? firstExistingColumn(usersCols, ["id", "user_id"]) : null;
+  const userNameCol = usersCols ? firstExistingColumn(usersCols, ["full_name", "name"]) : null;
+  const userFirstNameCol = usersCols ? firstExistingColumn(usersCols, ["first_name"]) : null;
+  const userLastNameCol = usersCols ? firstExistingColumn(usersCols, ["last_name"]) : null;
+  const userEmailCol = usersCols ? firstExistingColumn(usersCols, ["email", "username"]) : null;
+
+  let nurseNameExpr = "NULL";
+  let nurseEmailExpr = "NULL";
+
+  const joins = [];
+  if (nurseIdCol && nursesCols && nurseIdJoinCol) {
+    joins.push(`LEFT JOIN nurses n ON n.\`${nurseIdJoinCol}\` = t.\`${nurseIdCol}\``);
+
+    if (nurseNameCol) {
+      nurseNameExpr = `n.\`${nurseNameCol}\``;
+    } else if (nurseFirstNameCol || nurseLastNameCol) {
+      nurseNameExpr = `CONCAT_WS(' ', ${nurseFirstNameCol ? `n.\`${nurseFirstNameCol}\`` : "NULL"}, ${nurseLastNameCol ? `n.\`${nurseLastNameCol}\`` : "NULL"})`;
+    }
+
+    if (nurseEmailCol) {
+      nurseEmailExpr = `n.\`${nurseEmailCol}\``;
+    }
+
+    if (usersCols && userIdCol && nurseUserIdCol) {
+      joins.push(`LEFT JOIN users u ON u.\`${userIdCol}\` = n.\`${nurseUserIdCol}\``);
+      if (nurseNameExpr === "NULL") {
+        if (userNameCol) {
+          nurseNameExpr = `u.\`${userNameCol}\``;
+        } else if (userFirstNameCol || userLastNameCol) {
+          nurseNameExpr = `CONCAT_WS(' ', ${userFirstNameCol ? `u.\`${userFirstNameCol}\`` : "NULL"}, ${userLastNameCol ? `u.\`${userLastNameCol}\`` : "NULL"})`;
+        }
+      }
+      if (nurseEmailExpr === "NULL" && userEmailCol) {
+        nurseEmailExpr = `u.\`${userEmailCol}\``;
+      }
+    }
+  }
+
   const select = [
-    idCol ? `\`${idCol}\` AS id` : "NULL AS id",
-    `\`${patientCol}\` AS patient_id`,
-    titleCol ? `\`${titleCol}\` AS title` : "NULL AS title",
-    treatmentCol ? `\`${treatmentCol}\` AS treatment` : "NULL AS treatment",
-    testsCol ? `\`${testsCol}\` AS tests` : "NULL AS tests",
-    descriptionCol ? `\`${descriptionCol}\` AS description` : "NULL AS description",
-    priorityCol ? `\`${priorityCol}\` AS priority` : "'medium' AS priority",
-    statusCol ? `\`${statusCol}\` AS status` : "'pending' AS status",
-    assignedByCol ? `\`${assignedByCol}\` AS assigned_by` : "NULL AS assigned_by",
-    createdAtCol ? `\`${createdAtCol}\` AS created_at` : "NULL AS created_at",
+    idCol ? `t.\`${idCol}\` AS id` : "NULL AS id",
+    `t.\`${patientCol}\` AS patient_id`,
+    titleCol ? `t.\`${titleCol}\` AS title` : "NULL AS title",
+    treatmentCol ? `t.\`${treatmentCol}\` AS treatment` : "NULL AS treatment",
+    testsCol ? `t.\`${testsCol}\` AS tests` : "NULL AS tests",
+    descriptionCol ? `t.\`${descriptionCol}\` AS description` : "NULL AS description",
+    nurseNotesCol ? `t.\`${nurseNotesCol}\` AS nurse_notes` : "NULL AS nurse_notes",
+    priorityCol ? `t.\`${priorityCol}\` AS priority` : "'medium' AS priority",
+    statusCol ? `t.\`${statusCol}\` AS status` : "'pending' AS status",
+    assignedByCol ? `t.\`${assignedByCol}\` AS assigned_by` : "NULL AS assigned_by",
+    nurseIdCol ? `t.\`${nurseIdCol}\` AS nurse_id` : "NULL AS nurse_id",
+    `${nurseNameExpr} AS nurse_name`,
+    `${nurseEmailExpr} AS nurse_email`,
+    createdAtCol ? `t.\`${createdAtCol}\` AS created_at` : "NULL AS created_at",
   ];
 
-  const whereParts = [`\`${patientCol}\` = ?`];
+  const whereParts = [`t.\`${patientCol}\` = ?`];
   const params = [patientId];
 
   if (hospitalId && hospitalCol) {
-    whereParts.push(`\`${hospitalCol}\` = ?`);
+    whereParts.push(`t.\`${hospitalCol}\` = ?`);
     params.push(hospitalId);
   }
 
   if (assignedBy && assignedByCol) {
-    whereParts.push(`\`${assignedByCol}\` = ?`);
+    whereParts.push(`t.\`${assignedByCol}\` = ?`);
     params.push(assignedBy);
   }
 
   const orderParts = [];
-  if (createdAtCol) orderParts.push(`\`${createdAtCol}\` DESC`);
-  if (idCol) orderParts.push(`\`${idCol}\` DESC`);
+  if (createdAtCol) orderParts.push(`t.\`${createdAtCol}\` DESC`);
+  if (idCol) orderParts.push(`t.\`${idCol}\` DESC`);
   const orderSql = orderParts.length ? ` ORDER BY ${orderParts.join(", ")}` : "";
 
   const rows = await query(
-    `SELECT ${select.join(", ")} FROM nurse_tasks WHERE ${whereParts.join(" AND ")}${orderSql}`,
+    `SELECT ${select.join(", ")} FROM nurse_tasks t
+     ${joins.join("\n")}
+     WHERE ${whereParts.join(" AND ")}${orderSql}`,
     params
   );
 
@@ -359,6 +449,182 @@ async function listPlansByPatient({ hospitalId, patientId, assignedBy = null } =
     ...row,
     tests: normalizeTests(row?.tests),
   }));
+}
+
+async function listTasksByDoctor({ hospitalId, doctorId }) {
+  const cols = await getTableColumns("nurse_tasks");
+  if (!cols) throw new Error("nurse_tasks table not found");
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  const patientCol = firstExistingColumn(cols, ["patient_id"]);
+  const titleCol = firstExistingColumn(cols, ["task_title", "title"]);
+  const descriptionCol = firstExistingColumn(cols, ["description"]);
+  const nurseNotesCol = firstExistingColumn(cols, ["nurse_notes"]);
+  const treatmentCol = firstExistingColumn(cols, ["treatment"]);
+  const testsCol = firstExistingColumn(cols, ["tests"]);
+  const priorityCol = firstExistingColumn(cols, ["priority"]);
+  const statusCol = firstExistingColumn(cols, ["status"]);
+  const doctorCol = firstExistingColumn(cols, ["doctor_id", "assigned_by"]);
+  const nurseIdCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+  const createdAtCol = firstExistingColumn(cols, ["created_at"]);
+
+  if (!patientCol) throw new Error("nurse_tasks schema missing patient_id");
+
+  const patientCols = await getTableColumns("patients");
+  const patientIdCol = patientCols ? firstExistingColumn(patientCols, ["id", "patient_id", "user_id"]) : null;
+  const patientFullNameCol = patientCols ? firstExistingColumn(patientCols, ["full_name", "name"]) : null;
+  const patientFirstNameCol = patientCols ? firstExistingColumn(patientCols, ["first_name"]) : null;
+  const patientLastNameCol = patientCols ? firstExistingColumn(patientCols, ["last_name"]) : null;
+  const patientPhoneCol = patientCols ? firstExistingColumn(patientCols, ["phone", "mobile"]) : null;
+
+  const patientNameExpr = patientFullNameCol
+    ? `p.\`${patientFullNameCol}\``
+    : patientFirstNameCol || patientLastNameCol
+    ? `CONCAT_WS(' ', ${patientFirstNameCol ? `p.\`${patientFirstNameCol}\`` : "NULL"}, ${patientLastNameCol ? `p.\`${patientLastNameCol}\`` : "NULL"})`
+    : "NULL";
+
+  const joins = [];
+  if (patientCols && patientIdCol) {
+    joins.push(`LEFT JOIN patients p ON p.\`${patientIdCol}\` = t.\`${patientCol}\``);
+  }
+
+  // Nurse identity (best-effort across schema modes)
+  const nursesCols = await getTableColumns("nurses");
+  const nurseIdJoinCol = nursesCols ? firstExistingColumn(nursesCols, ["id", "nurse_id", "user_id"]) : null;
+  const nurseUserIdCol = nursesCols ? firstExistingColumn(nursesCols, ["user_id"]) : null;
+  const nurseNameCol = nursesCols ? firstExistingColumn(nursesCols, ["full_name", "name"]) : null;
+  const nurseFirstNameCol = nursesCols ? firstExistingColumn(nursesCols, ["first_name"]) : null;
+  const nurseLastNameCol = nursesCols ? firstExistingColumn(nursesCols, ["last_name"]) : null;
+  const nurseEmailCol = nursesCols ? firstExistingColumn(nursesCols, ["email"]) : null;
+
+  const usersCols = nurseUserIdCol ? await getTableColumns("users") : null;
+  const userIdCol = usersCols ? firstExistingColumn(usersCols, ["id", "user_id"]) : null;
+  const userNameCol = usersCols ? firstExistingColumn(usersCols, ["full_name", "name"]) : null;
+  const userFirstNameCol = usersCols ? firstExistingColumn(usersCols, ["first_name"]) : null;
+  const userLastNameCol = usersCols ? firstExistingColumn(usersCols, ["last_name"]) : null;
+  const userEmailCol = usersCols ? firstExistingColumn(usersCols, ["email", "username"]) : null;
+
+  const select = [
+    idCol ? `t.\`${idCol}\` AS id` : "NULL AS id",
+    `t.\`${patientCol}\` AS patient_id`,
+    titleCol ? `t.\`${titleCol}\` AS title` : "NULL AS title",
+    treatmentCol ? `t.\`${treatmentCol}\` AS treatment` : "NULL AS treatment",
+    testsCol ? `t.\`${testsCol}\` AS tests` : "NULL AS tests",
+    descriptionCol ? `t.\`${descriptionCol}\` AS description` : "NULL AS description",
+    nurseNotesCol ? `t.\`${nurseNotesCol}\` AS nurse_notes` : "NULL AS nurse_notes",
+    priorityCol ? `t.\`${priorityCol}\` AS priority` : "'medium' AS priority",
+    statusCol ? `t.\`${statusCol}\` AS status` : "'pending' AS status",
+    nurseIdCol ? `t.\`${nurseIdCol}\` AS nurse_id` : "NULL AS nurse_id",
+    createdAtCol ? `t.\`${createdAtCol}\` AS created_at` : "NULL AS created_at",
+    patientCols && patientIdCol ? `${patientNameExpr} AS patient_name` : "NULL AS patient_name",
+    patientCols && patientPhoneCol ? `p.\`${patientPhoneCol}\` AS patient_phone` : "NULL AS patient_phone",
+  ];
+
+  let nurseNameExpr = "NULL";
+  let nurseEmailExpr = "NULL";
+
+  if (nursesCols && nurseIdJoinCol && nurseIdCol) {
+    joins.push(`LEFT JOIN nurses n ON n.\`${nurseIdJoinCol}\` = t.\`${nurseIdCol}\``);
+
+    if (nurseNameCol) {
+      nurseNameExpr = `n.\`${nurseNameCol}\``;
+    } else if (nurseFirstNameCol || nurseLastNameCol) {
+      nurseNameExpr = `CONCAT_WS(' ', ${nurseFirstNameCol ? `n.\`${nurseFirstNameCol}\`` : "NULL"}, ${nurseLastNameCol ? `n.\`${nurseLastNameCol}\`` : "NULL"})`;
+    }
+
+    if (nurseEmailCol) {
+      nurseEmailExpr = `n.\`${nurseEmailCol}\``;
+    }
+
+    if (usersCols && userIdCol && nurseUserIdCol) {
+      joins.push(`LEFT JOIN users u ON u.\`${userIdCol}\` = n.\`${nurseUserIdCol}\``);
+
+      if (nurseNameExpr === "NULL") {
+        if (userNameCol) {
+          nurseNameExpr = `u.\`${userNameCol}\``;
+        } else if (userFirstNameCol || userLastNameCol) {
+          nurseNameExpr = `CONCAT_WS(' ', ${userFirstNameCol ? `u.\`${userFirstNameCol}\`` : "NULL"}, ${userLastNameCol ? `u.\`${userLastNameCol}\`` : "NULL"})`;
+        }
+      }
+
+      if (nurseEmailExpr === "NULL" && userEmailCol) {
+        nurseEmailExpr = `u.\`${userEmailCol}\``;
+      }
+    }
+  }
+
+  select.push(`${nurseNameExpr} AS nurse_name`);
+  select.push(`${nurseEmailExpr} AS nurse_email`);
+
+  const where = [];
+  const params = [];
+
+  if (hospitalId && hospitalCol) {
+    where.push(`t.\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  if (doctorId && doctorCol) {
+    where.push(`t.\`${doctorCol}\` = ?`);
+    params.push(doctorId);
+  }
+
+  const orderParts = [];
+  if (createdAtCol) orderParts.push(`t.\`${createdAtCol}\` DESC`);
+  if (idCol) orderParts.push(`t.\`${idCol}\` DESC`);
+
+  const sql = `SELECT ${select.join(", ")}
+    FROM nurse_tasks t
+    ${joins.join("\n")}
+    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+    ${orderParts.length ? `ORDER BY ${orderParts.join(", ")}` : ""}
+    LIMIT 100`;
+
+  const rows = await query(sql, params);
+  return rows.map((row) => ({
+    ...row,
+    tests: normalizeTests(row?.tests),
+  }));
+}
+
+async function updateTaskNotes({ taskId, hospitalId, nurseId, notes }) {
+  const cols = await getTableColumns("nurse_tasks");
+  if (!cols) throw new Error("nurse_tasks table not found");
+
+  const notesCol = firstExistingColumn(cols, ["nurse_notes"]);
+  if (!notesCol) {
+    const err = new Error("Notes not supported by current database schema");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const idCol = firstExistingColumn(cols, ["id", "task_id"]);
+  const hospitalCol = firstExistingColumn(cols, ["hospital_id", "hospitalId"]);
+  const nurseCol = firstExistingColumn(cols, ["assigned_nurse_id", "nurse_id"]);
+  if (!idCol || !nurseCol) throw new Error("nurse_tasks schema missing required columns");
+
+  const safeNotes = normalizeNote(notes);
+
+  const where = [`\`${idCol}\` = ?`, `\`${nurseCol}\` = ?`];
+  const params = [taskId, nurseId];
+  if (hospitalId && hospitalCol) {
+    where.push(`\`${hospitalCol}\` = ?`);
+    params.push(hospitalId);
+  }
+
+  const result = await query(
+    `UPDATE nurse_tasks SET \`${notesCol}\` = ? WHERE ${where.join(" AND ")}`,
+    [safeNotes, ...params]
+  );
+
+  if (!result?.affectedRows) {
+    const err = new Error("Only the assigned nurse can update notes");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  return getTaskById(taskId, hospitalId);
 }
 
 module.exports = {
@@ -370,4 +636,6 @@ module.exports = {
   startTask,
   completeTask,
   listPlansByPatient,
+  listTasksByDoctor,
+  updateTaskNotes,
 };

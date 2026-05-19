@@ -10,7 +10,9 @@ export default function BatchModal({ medicine, batches, onAdd, onClose }) {
             Array.isArray(batches)
                 ? batches.find((batch) => !batch.isExpired && Number(batch.quantity || 0) > 0) || null
                 : null;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedBatch(firstAvailableBatch);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setQty(1);
     }, [batches, medicine]);
 

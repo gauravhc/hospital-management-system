@@ -15,14 +15,12 @@ const isUrgent = (row) => {
 };
 
 export default function LabNotificationsPage() {
-  const [username, setUsername] = useState("Lab Tech");
+  const [username] = useState(() => {
+    if (typeof window === "undefined") return "Lab Tech";
+    return localStorage.getItem("username") || "Lab Tech";
+  });
   const [tests, setTests] = useState([]);
   const [reports, setReports] = useState([]);
-
-  useEffect(() => {
-    const user = localStorage.getItem("username");
-    setUsername(user || "Lab Tech");
-  }, []);
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -41,6 +39,7 @@ export default function LabNotificationsPage() {
       }
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadFeed();
   }, []);
 

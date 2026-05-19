@@ -27,7 +27,10 @@ const insetCard = "rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4";
 
 export default function RegisterDashboard() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [username] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("username") || "";
+  });
   const [stats, setStats] = useState({
     totalPatients: 0,
     todayAppointments: 0,
@@ -47,11 +50,6 @@ export default function RegisterDashboard() {
     payment: "all",
     sort: "timeAsc",
   });
-
-  useEffect(() => {
-    const user = localStorage.getItem("username");
-    setUsername(user || "");
-  }, []);
 
   useEffect(() => {
     const fetchDashboard = async (date) => {

@@ -13,10 +13,12 @@ router.post("/", asyncHandler(controller.create));
 // Backward compatible endpoint
 router.post("/assign", asyncHandler(controller.assign));
 router.get("/patient/:patientId", asyncHandler(controller.patientHistory));
+router.get("/doctor", asyncHandler(controller.doctorTasks));
 
 // Nurse workflow
 router.put("/:id/accept", asyncHandler(controller.accept));
 router.put("/:id/start", asyncHandler(controller.start));
 router.put("/:id/complete", asyncHandler(controller.complete));
+router.put("/:id/notes", asyncHandler(controller.notes));
 
 module.exports = router;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiPost } from "@/services/api";
 
@@ -13,7 +13,6 @@ const COUNTRY_CODES = [
 
 export default function PatientCreatePage() {
     const router = useRouter();
-    const [username, setUsername] = useState("");
 
     const [form, setForm] = useState({
         fullName: "",
@@ -33,11 +32,6 @@ export default function PatientCreatePage() {
         country: "India",
         pincode: "",
     });
-
-    useEffect(() => {
-        const user = localStorage.getItem("username");
-        setUsername(user || "");
-    }, []);
 
     const updateField = (name, value) => {
         setForm((prev) => ({ ...prev, [name]: value }));

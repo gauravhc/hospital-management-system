@@ -15,7 +15,8 @@ import {
   Camera,
   Stethoscope,
   Activity,
-  Users
+  Users,
+  ClipboardList
 } from "lucide-react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
@@ -47,6 +48,9 @@ export default function DoctorPage() {
   const [appointments, setAppointments] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [nurseTasks, setNurseTasks] = useState([]);
+  const [nurseTasksLoading, setNurseTasksLoading] = useState(false);
+  const [nurseTasksError, setNurseTasksError] = useState("");
 
   // Search & Filter
   const [search, setSearch] = useState("");
@@ -86,6 +90,23 @@ export default function DoctorPage() {
     }
   }, []);
 
+  const fetchNurseTasks = useCallback(async () => {
+    setNurseTasksLoading(true);
+    setNurseTasksError("");
+    try {
+      const res = await apiGet("/api/tasks/doctor");
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      setNurseTasks(list);
+    } catch (err) {
+      // keep doctor dashboard resilient even if tasks endpoint isn't available yet
+      console.error("Error fetching nurse tasks:", err);
+      setNurseTasksError(err?.message || "Failed to load nurse tasks");
+      setNurseTasks([]);
+    } finally {
+      setNurseTasksLoading(false);
+    }
+  }, []);
+
   // 1. Init (Auth + Theme + Greeting)
   useEffect(() => {
     // Auth Check
@@ -122,6 +143,13 @@ export default function DoctorPage() {
 
     // Fetch Data
     fetchAppointments(userId);
+    fetchNurseTasks();
+
+    const taskInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchNurseTasks();
+      }
+    }, 10_000);
 
     const loadHospital = async (hospitalId) => {
       const hid = String(hospitalId || "").trim();
@@ -160,7 +188,9 @@ export default function DoctorPage() {
         // ignore
       }
     })();
-  }, [fetchAppointments, router]);
+
+    return () => clearInterval(taskInterval);
+  }, [fetchAppointments, fetchNurseTasks, router]);
 
   const goToProfile = () => {
     setProfileMessage("");
@@ -278,6 +308,38 @@ export default function DoctorPage() {
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
         {icon}
         {s.charAt(0).toUpperCase() + s.slice(1)}
+      </span>
+    );
+  };
+
+  const renderTaskStatusBadge = (status) => {
+    const raw = String(status || "pending").toLowerCase().replace(/_/g, "-");
+    let colorClass, icon;
+
+    if (raw === "completed") {
+      colorClass = "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+      icon = <CheckCircle size={12} className="mr-1" />;
+    } else if (raw === "in-progress") {
+      colorClass = "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400";
+      icon = <Activity size={12} className="mr-1" />;
+    } else if (raw === "accepted") {
+      colorClass = "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300";
+      icon = <CheckCircle size={12} className="mr-1" />;
+    } else {
+      colorClass = "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+      icon = <Clock size={12} className="mr-1" />;
+    }
+
+    const label = raw
+      .split("-")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+        {icon}
+        {label}
       </span>
     );
   };
@@ -436,6 +498,80 @@ export default function DoctorPage() {
                 <AlertCircle size={20} />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Nurse Task Progress (from nurses) */}
+        <div className="mt-6 bg-white/95 dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <ClipboardList className="text-indigo-500" size={20} /> Nurse Task Progress
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Shows when a nurse accepts/starts/completes tasks you created.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchNurseTasks}
+              disabled={nurseTasksLoading}
+              className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-extrabold text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              {nurseTasksLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+
+          <div className="p-5">
+            {nurseTasksError ? (
+              <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+                {nurseTasksError} (Make sure the `backend/` server is running on `NEXT_PUBLIC_API_BASE_URL` and not `hds/app.js`.)
+              </div>
+            ) : null}
+
+            {nurseTasksLoading ? (
+              <p className="text-sm text-slate-500">Loading tasks...</p>
+            ) : nurseTasks.length === 0 ? (
+              <p className="text-sm text-slate-500">No nurse tasks yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-[900px] w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-500 text-xs uppercase tracking-wider">
+                      <th className="p-3">Patient</th>
+                      <th className="p-3">Title</th>
+                      <th className="p-3">Priority</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Nurse</th>
+                      <th className="p-3">Nurse Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    {nurseTasks.slice(0, 8).map((t) => (
+                      <tr key={String(t.id || `${t.patient_id}-${t.created_at || ""}`)}>
+                        <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                          {t.patient_name || t.patient_id || "--"}
+                          {t.patient_phone ? (
+                            <div className="text-xs font-normal text-slate-500">{t.patient_phone}</div>
+                          ) : null}
+                        </td>
+                        <td className="p-3 text-slate-700 dark:text-slate-300">
+                          {t.title || t.task_title || "Treatment & Tests"}
+                        </td>
+                        <td className="p-3 text-slate-700 dark:text-slate-300">{t.priority || "medium"}</td>
+                        <td className="p-3">{renderTaskStatusBadge(t.status)}</td>
+                        <td className="p-3 text-slate-700 dark:text-slate-300">
+                          {t.nurse_name || t.nurse_email || t.nurse_id || "--"}
+                        </td>
+                        <td className="p-3 text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-w-[360px]">
+                          {String(t.nurse_notes || "").trim() || "--"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 

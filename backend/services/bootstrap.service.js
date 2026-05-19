@@ -256,6 +256,7 @@ const statements = [
       task_title VARCHAR(255) NULL,
       title VARCHAR(255) NULL,
       description TEXT NULL,
+      nurse_notes TEXT NULL,
       treatment TEXT NULL,
       tests TEXT NULL,
       priority ENUM('low','medium','high') DEFAULT 'medium',
@@ -939,6 +940,7 @@ async function ensureNurseModuleTables() {
         doctor_id INT NULL,
         task_title VARCHAR(255) NULL,
         description TEXT NULL,
+        nurse_notes TEXT NULL,
         treatment TEXT NULL,
         tests TEXT NULL,
         status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending',
@@ -978,6 +980,7 @@ async function ensureNurseModuleTables() {
       await addColumnIfMissing("doctor_id", "`doctor_id` INT NULL");
       await addColumnIfMissing("task_title", "`task_title` VARCHAR(255) NULL");
       await addColumnIfMissing("description", "`description` TEXT NULL");
+      await addColumnIfMissing("nurse_notes", "`nurse_notes` TEXT NULL");
       await addColumnIfMissing("treatment", "`treatment` TEXT NULL");
       await addColumnIfMissing("tests", "`tests` TEXT NULL");
       await addColumnIfMissing("priority", "`priority` ENUM('low','medium','high') DEFAULT 'medium'");
@@ -1017,6 +1020,7 @@ async function ensureNurseModuleTables() {
       doctor_id VARCHAR(36) NULL,
       task_title VARCHAR(255) NULL,
       description TEXT NULL,
+      nurse_notes TEXT NULL,
       treatment TEXT NULL,
       tests TEXT NULL,
       status ENUM('pending','accepted','in_progress','completed') DEFAULT 'pending',
@@ -1064,6 +1068,7 @@ async function ensureNurseModuleTables() {
 	    await addColumnIfMissing("doctor_id", "`doctor_id` VARCHAR(36) NULL");
 	    await addColumnIfMissing("task_title", "`task_title` VARCHAR(255) NULL");
 	    await addColumnIfMissing("description", "`description` TEXT NULL");
+	    await addColumnIfMissing("nurse_notes", "`nurse_notes` TEXT NULL");
 	    await addColumnIfMissing("treatment", "`treatment` TEXT NULL");
 	    await addColumnIfMissing("tests", "`tests` TEXT NULL");
 	    await addColumnIfMissing("priority", "`priority` ENUM('low','medium','high') DEFAULT 'medium'");

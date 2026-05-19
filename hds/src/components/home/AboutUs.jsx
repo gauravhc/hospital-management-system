@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const AboutUs = () => {
     const features = [
@@ -11,6 +12,36 @@ const AboutUs = () => {
         "Minor outpatient procedures",
         "Experienced Healthcare Providers"
     ];
+
+    const SafeImage = ({ src, fallbackSrc, alt, className }) => {
+        const imgRef = useRef(null);
+        const [currentSrc, setCurrentSrc] = useState(src);
+
+        useEffect(() => {
+            setCurrentSrc(src);
+        }, [src]);
+
+        useEffect(() => {
+            const img = imgRef.current;
+            if (!img) return;
+
+            // If the image failed to load before React attached handlers (SSR -> hydration),
+            // detect the broken state and swap to fallback.
+            if (img.complete && img.naturalWidth === 0) {
+                setCurrentSrc(fallbackSrc);
+            }
+        }, [fallbackSrc, currentSrc]);
+
+        return (
+            <img
+                ref={imgRef}
+                src={currentSrc}
+                alt={alt}
+                className={className}
+                onError={() => setCurrentSrc(fallbackSrc)}
+            />
+        );
+    };
 
     return (
         <section className="py-20 bg-white overflow-hidden">
@@ -44,25 +75,29 @@ const AboutUs = () => {
                     <div className="relative">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-4 pt-12">
-                                <img
+                                <SafeImage
                                     src="https://images.unsplash.com/photo-1579684385136-137af18db00aa?q=80&w=2070&auto=format&fit=crop"
+                                    fallbackSrc="/images/hero-dashboard.png"
                                     alt="Medical Facility"
                                     className="rounded-2xl shadow-lg w-full h-48 object-cover"
                                 />
-                                <img
+                                <SafeImage
                                     src="https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?q=80&w=2070&auto=format&fit=crop"
+                                    fallbackSrc="/images/hero-dashboard.png"
                                     alt="Doctor Consultation"
                                     className="rounded-2xl shadow-lg w-full h-64 object-cover"
                                 />
                             </div>
                             <div className="space-y-4">
-                                <img
+                                <SafeImage
                                     src="https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?q=80&w=2091&auto=format&fit=crop"
+                                    fallbackSrc="/images/hero-dashboard.png"
                                     alt="Surgery"
                                     className="rounded-2xl shadow-lg w-full h-64 object-cover"
                                 />
-                                <img
+                                <SafeImage
                                     src="https://images.unsplash.com/photo-1551076805-e1869033e561?q=80&w=2070&auto=format&fit=crop"
+                                    fallbackSrc="/images/hero-dashboard.png"
                                     alt="Laboratory"
                                     className="rounded-2xl shadow-lg w-full h-48 object-cover"
                                 />

@@ -15,13 +15,6 @@ export default function InventoryItemsPage() {
   // fetch error state
   const [fetchError, setFetchError] = useState(null);
 
-  useEffect(() => {
-    fetchItems();
-    // initialize filter from query param (if present)
-    const cat = searchParams?.get("category") || "";
-    if (cat) setFilterCategory(decodeURIComponent(cat));
-  }, []);
-
   const fetchItems = async () => {
     try {
       const data = await apiGet("/api/inventory/items");
@@ -29,11 +22,22 @@ export default function InventoryItemsPage() {
       setItems(list);
       setFetchError(null);
     } catch (err) {
-      console.error('Failed to fetch inventory items', err);
+      console.error("Failed to fetch inventory items", err);
       setItems([]);
-      setFetchError(err.message || 'Failed to fetch');
+      setFetchError(err.message || "Failed to fetch");
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchItems();
+    // initialize filter from query param (if present)
+    const cat = searchParams?.get("category") || "";
+    if (cat) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFilterCategory(decodeURIComponent(cat));
+    }
+  }, []);
 
   const handleDelete = async (id) => {
     if (!confirm("Are you sure you want to delete this item?")) return;

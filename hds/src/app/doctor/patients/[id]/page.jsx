@@ -241,23 +241,31 @@ export default function DoctorPatientDetailsPage() {
                       <th className="py-2">Treatment</th>
                       <th className="py-2">Tests</th>
                       <th className="py-2">Priority</th>
+                      <th className="py-2">Nurse</th>
                       <th className="py-2">Status</th>
+                      <th className="py-2">Nurse Notes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {plans.map((p) => {
                       const tests = Array.isArray(p?.tests) ? p.tests : p?.tests ? [String(p.tests)] : [];
                       const when = p?.created_at ? String(p.created_at).split("T")[0] : "--";
+                      const nurseLabel = p?.nurse_name || p?.nurse_email || p?.nurse_id || "--";
+                      const nurseNotes = String(p?.nurse_notes || "").trim();
                       return (
                         <tr key={String(p.id || `${when}-${p.title || ""}`)} className="border-t border-slate-100">
                           <td className="py-3 font-semibold text-slate-900">{when}</td>
                           <td className="py-3 text-slate-700 whitespace-pre-wrap">{p?.treatment || "--"}</td>
                           <td className="py-3 text-slate-700">{tests.length ? tests.join(", ") : "--"}</td>
                           <td className="py-3 text-slate-700">{p?.priority || "--"}</td>
+                          <td className="py-3 text-slate-700">{nurseLabel}</td>
                           <td className="py-3">
                             <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
                               {p?.status || "--"}
                             </span>
+                          </td>
+                          <td className="py-3 text-slate-700 whitespace-pre-wrap max-w-[340px]">
+                            {nurseNotes || "--"}
                           </td>
                         </tr>
                       );
@@ -272,4 +280,3 @@ export default function DoctorPatientDetailsPage() {
     </div>
   );
 }
-

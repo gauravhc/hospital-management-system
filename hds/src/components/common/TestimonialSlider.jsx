@@ -45,7 +45,7 @@ const TestimonialSlider = () => {
 
             <div className="relative z-10 text-center px-4 md:px-12">
                 <p className="text-xl md:text-2xl text-gray-700 italic mb-8 leading-relaxed">
-                    "{testimonials[currentIndex].text}"
+                    &quot;{testimonials[currentIndex].text}&quot;
                 </p>
 
                 <div className="flex flex-col items-center">

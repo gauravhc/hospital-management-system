@@ -1,5 +1,16 @@
 const { ok } = require("../../services/module.helper");
-const { assignTask, resolveHospitalIdForRow, pickDefaultAssigneeId, listPlansByPatient, normalizeTests, acceptTask, startTask, completeTask } = require("./service");
+const {
+  assignTask,
+  resolveHospitalIdForRow,
+  pickDefaultAssigneeId,
+  listPlansByPatient,
+  listTasksByDoctor,
+  normalizeTests,
+  acceptTask,
+  startTask,
+  completeTask,
+  updateTaskNotes,
+} = require("./service");
 
 function normalizePriority(value) {
   const p = String(value || "").trim().toLowerCase();
@@ -145,6 +156,25 @@ async function patientHistory(req, res) {
   return ok(res, rows, "Success");
 }
 
+async function doctorTasks(req, res) {
+  const role = String(req.user?.role || "").toLowerCase();
+  if (role !== "doctor") {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
+  const hospitalId = req.user?.hospital_id ?? null;
+  if (!hospitalId) {
+    return res.status(400).json({ success: false, message: "Hospital not found for current user" });
+  }
+
+  const rows = await listTasksByDoctor({
+    hospitalId,
+    doctorId: req.user?.id ?? null,
+  });
+
+  return ok(res, rows, "Success");
+}
+
 async function accept(req, res) {
   const role = String(req.user?.role || "").toLowerCase();
   if (role !== "nurse") {
@@ -160,6 +190,7 @@ async function accept(req, res) {
     taskId: req.params.id,
     hospitalId,
     nurseId: req.user?.id ?? null,
+    notes: req.body?.notes ?? req.body?.nurse_notes ?? null,
   });
 
   return ok(res, updated, "Task accepted");
@@ -180,6 +211,7 @@ async function start(req, res) {
     taskId: req.params.id,
     hospitalId,
     nurseId: req.user?.id ?? null,
+    notes: req.body?.notes ?? req.body?.nurse_notes ?? null,
   });
 
   return ok(res, updated, "Task started");
@@ -200,16 +232,42 @@ async function complete(req, res) {
     taskId: req.params.id,
     hospitalId,
     nurseId: req.user?.id ?? null,
+    notes: req.body?.notes ?? req.body?.nurse_notes ?? null,
   });
 
   return ok(res, updated, "Task completed");
+}
+
+async function notes(req, res) {
+  const role = String(req.user?.role || "").toLowerCase();
+  if (role !== "nurse") {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
+  const hospitalId = req.user?.hospital_id ?? null;
+  if (!hospitalId) {
+    return res.status(400).json({ success: false, message: "Hospital not found for current user" });
+  }
+
+  const notesValue = String(req.body?.notes ?? req.body?.nurse_notes ?? "").trim();
+
+  const updated = await updateTaskNotes({
+    taskId: req.params.id,
+    hospitalId,
+    nurseId: req.user?.id ?? null,
+    notes: notesValue,
+  });
+
+  return ok(res, updated, "Notes saved");
 }
 
 module.exports = {
   create,
   assign,
   patientHistory,
+  doctorTasks,
   accept,
   start,
   complete,
+  notes,
 };

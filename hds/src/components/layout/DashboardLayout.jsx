@@ -11,6 +11,14 @@ export default function DashboardLayout({ children, role, navItems }) {
             ? "Hospital Admin"
             : role === "super_admin"
                 ? "Super Admin"
+                : role === "register"
+                    ? "Reception"
+                    : role === "accountant"
+                        ? "Accountant"
+                        : role === "inventory"
+                            ? "Inventory"
+                            : role === "pharmacist"
+                                ? "Pharmacy"
                 : role.charAt(0).toUpperCase() + role.slice(1);
 
     const user = useSyncExternalStore(

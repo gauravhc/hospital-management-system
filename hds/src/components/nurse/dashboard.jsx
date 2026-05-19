@@ -78,6 +78,7 @@ export default function NurseDashboard() {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [search, setSearch] = useState("");
+  const [notesDraft, setNotesDraft] = useState("");
 
   const [vitalsLoading, setVitalsLoading] = useState(false);
   const [vitalsHistory, setVitalsHistory] = useState([]);
@@ -176,6 +177,11 @@ export default function NurseDashboard() {
       const res = await apiGet("/api/nurse/tasks");
       const list = Array.isArray(res?.data) ? res.data : [];
       setTasks(list);
+      setSelectedTask((current) => {
+        if (!current?.id) return current;
+        const match = list.find((t) => String(t?.id) === String(current.id));
+        return match || current;
+      });
     } catch (e) {
       setError(e?.message || "Failed to load tasks.");
       setTasks([]);
@@ -183,6 +189,11 @@ export default function NurseDashboard() {
       setTasksLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!selectedTask?.id) return;
+    setNotesDraft(String(selectedTask?.nurse_notes || ""));
+  }, [selectedTask?.id]);
 
   const filtered = useMemo(() => {
     const q = String(search || "").trim().toLowerCase();
@@ -233,6 +244,7 @@ export default function NurseDashboard() {
 
   const openTask = (task) => {
     setSelectedTask(task);
+    setNotesDraft(String(task?.nurse_notes || ""));
     setBp("");
     setHeartRate("");
     setTemperature("");
@@ -247,18 +259,31 @@ export default function NurseDashboard() {
 
     try {
       if (action === "accept") {
-        await apiPut(`/api/tasks/${id}/accept`);
+        await apiPut(`/api/tasks/${id}/accept`, { notes: notesDraft });
         showToast("success", "Task accepted");
       } else if (action === "start") {
-        await apiPut(`/api/tasks/${id}/start`);
+        await apiPut(`/api/tasks/${id}/start`, { notes: notesDraft });
         showToast("success", "Task started");
       } else if (action === "complete") {
-        await apiPut(`/api/tasks/${id}/complete`);
+        await apiPut(`/api/tasks/${id}/complete`, { notes: notesDraft });
         showToast("success", "Task completed");
       }
       await loadTasks();
     } catch (e) {
       showToast("error", e?.message || "Failed to update task");
+    }
+  };
+
+  const saveNotes = async () => {
+    const id = selectedTask?.id;
+    if (!id) return;
+
+    try {
+      await apiPut(`/api/tasks/${id}/notes`, { notes: notesDraft });
+      showToast("success", "Notes saved");
+      await loadTasks();
+    } catch (e) {
+      showToast("error", e?.message || "Failed to save notes");
     }
   };
 
@@ -616,13 +641,37 @@ export default function NurseDashboard() {
                         )}
                       </div>
 
-                      <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/30">
-                        <p className="text-xs font-semibold text-rose-800 dark:text-rose-300 uppercase mb-1">
-                          Notes
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-2">
+                          Doctor Instructions
                         </p>
-                        <p className="text-sm text-rose-900 dark:text-rose-100 leading-relaxed whitespace-pre-wrap">
+                        <p className="text-sm text-slate-800 dark:text-slate-100 leading-relaxed whitespace-pre-wrap">
                           {selectedTask.description || "--"}
                         </p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/30">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold text-rose-800 dark:text-rose-300 uppercase">
+                            Nurse Notes
+                          </p>
+                          <button
+                            type="button"
+                            onClick={saveNotes}
+                            disabled={assignedNurseOf(selectedTask) !== String(nurseId || "")}
+                            className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-rose-800"
+                          >
+                            Save
+                          </button>
+                        </div>
+                        <textarea
+                          value={notesDraft}
+                          onChange={(e) => setNotesDraft(e.target.value)}
+                          placeholder="Add updates for the doctor..."
+                          rows={4}
+                          disabled={assignedNurseOf(selectedTask) !== String(nurseId || "")}
+                          className="mt-2 w-full rounded-xl border border-rose-200 bg-white/80 px-3 py-2 text-sm text-rose-900 outline-none focus:ring-2 focus:ring-rose-400 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-100"
+                        />
                       </div>
                     </div>
 

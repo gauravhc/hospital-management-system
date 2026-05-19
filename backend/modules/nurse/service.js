@@ -66,6 +66,7 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
   const taskDoctorCol = firstExistingColumn(taskCols, ["doctor_id"]);
   const titleCol = firstExistingColumn(taskCols, ["task_title", "title"]);
   const descriptionCol = firstExistingColumn(taskCols, ["description"]);
+  const nurseNotesCol = firstExistingColumn(taskCols, ["nurse_notes"]);
   const treatmentCol = firstExistingColumn(taskCols, ["treatment"]);
   const testsCol = firstExistingColumn(taskCols, ["tests"]);
   const statusCol = firstExistingColumn(taskCols, ["status"]);
@@ -100,6 +101,7 @@ async function buildTasksQuery({ nurseId, hospitalId }) {
     treatmentCol ? `t.\`${treatmentCol}\` AS treatment` : "NULL AS treatment",
     testsCol ? `t.\`${testsCol}\` AS tests` : "NULL AS tests",
     descriptionCol ? `t.\`${descriptionCol}\` AS description` : "NULL AS description",
+    nurseNotesCol ? `t.\`${nurseNotesCol}\` AS nurse_notes` : "NULL AS nurse_notes",
     statusCol ? `t.\`${statusCol}\` AS status` : "'pending' AS status",
     priorityCol ? `t.\`${priorityCol}\` AS priority` : "'medium' AS priority",
     assignedByCol ? `t.\`${assignedByCol}\` AS assigned_by` : "NULL AS assigned_by",

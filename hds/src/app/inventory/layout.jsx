@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-// Header removed to avoid duplication
-import MobileTabNav from "@/components/layout/MobileTabNav";
-import InventorySidebar from "@/components/inventory/sidebar";
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 const NAV_ITEMS = [
     { name: "Dashboard", href: "/inventory" },
@@ -18,34 +17,33 @@ const NAV_ITEMS = [
 ];
 
 export default function InventoryLayout({ children }) {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const router = useRouter();
+
+    const auth = useMemo(() => {
+        if (typeof window === "undefined") return { checked: false, allowed: false };
+        const token = localStorage.getItem("token");
+        const role = (localStorage.getItem("role") || "").toLowerCase();
+
+        const allowed =
+            Boolean(token) &&
+            (role === "inventory" ||
+                role.includes("inventory") ||
+                role === "admin" ||
+                role === "hospital_admin" ||
+                role === "super_admin");
+
+        return { checked: true, allowed };
+    }, []);
+
+    useEffect(() => {
+        if (auth.checked && !auth.allowed) router.push("/login");
+    }, [auth.allowed, auth.checked, router]);
+
+    if (!auth.checked || !auth.allowed) return null;
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50">
-            {/* Header is provided by RootLayout */}
-
-            <div className="flex flex-1 overflow-hidden">
-                {/* Desktop Sidebar - Hidden on Mobile */}
-                <div className="hidden md:block h-full">
-                    <InventorySidebar
-                        isOpen={isSidebarOpen}
-                        onClose={() => setIsSidebarOpen(false)}
-                    />
-                </div>
-
-                <div className="flex flex-1 flex-col overflow-hidden">
-                    {/* Mobile Navigation - Horizontal Scroll */}
-                    <MobileTabNav
-                        navItems={NAV_ITEMS}
-                        title="Inventory"
-                        username="Inventory Mgr"
-                    />
-
-                    <main className="flex-1 overflow-y-auto p-4 md:p-6 transition-all duration-300">
-                        {children}
-                    </main>
-                </div>
-            </div>
-        </div>
+        <DashboardLayout role="inventory" navItems={NAV_ITEMS}>
+            {children}
+        </DashboardLayout>
     );
 }

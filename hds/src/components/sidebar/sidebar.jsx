@@ -16,6 +16,8 @@ import {
     FaUserNurse,
     FaVial,
     FaHome,
+    FaCashRegister,
+    FaBoxes,
     FaSignOutAlt
 } from "react-icons/fa";
 
@@ -93,6 +95,53 @@ const ROLE_MENUS = {
                 { title: "Create User", href: "/super-admin/users/create", icon: <FaUserNurse size={18} />, subtitle: "Onboarding" },
             ]
         }
+    ],
+    register: [
+        {
+            title: "Reception", items: [
+                { title: "Dashboard", href: "/register", icon: <FaCashRegister size={18} />, subtitle: "Overview" },
+                { title: "New Patient", href: "/register/patient-create", icon: <FaUserMd size={18} />, subtitle: "Register" },
+                { title: "Appointments", href: "/register/registration", icon: <FaCalendarAlt size={18} />, subtitle: "Bookings" },
+                { title: "Billing", href: "/register/billing", icon: <FaFileInvoiceDollar size={18} />, subtitle: "Invoices" },
+                { title: "Reports", href: "/register/report", icon: <FaFileMedical size={18} />, subtitle: "Summary" },
+                { title: "Notifications", href: "/register/notifications", icon: <FaShieldAlt size={18} />, subtitle: "Alerts" },
+            ]
+        }
+    ],
+    accountant: [
+        {
+            title: "Finance", items: [
+                { title: "Dashboard", href: "/accountant", icon: <FaFileInvoiceDollar size={18} />, subtitle: "Overview" },
+                { title: "Invoices", href: "/accountant/invoices", icon: <FaFileInvoiceDollar size={18} />, subtitle: "Manage" },
+                { title: "Collections", href: "/accountant/collections", icon: <FaFileInvoiceDollar size={18} />, subtitle: "Payments" },
+                { title: "Reports", href: "/accountant/reports", icon: <FaFileMedical size={18} />, subtitle: "Exports" },
+            ]
+        }
+    ],
+    inventory: [
+        {
+            title: "Inventory", items: [
+                { title: "Dashboard", href: "/inventory", icon: <FaBoxes size={18} />, subtitle: "Overview" },
+                { title: "Analytics", href: "/inventory/analytics-dashboard", icon: <FaFileMedical size={18} />, subtitle: "Trends" },
+                { title: "Add Items", href: "/inventory/additems", icon: <FaBoxes size={18} />, subtitle: "Create" },
+                { title: "Manage Items", href: "/inventory/manageitems", icon: <FaBoxes size={18} />, subtitle: "Update" },
+                { title: "All Stocks", href: "/inventory/allstocks", icon: <FaBoxes size={18} />, subtitle: "List" },
+                { title: "Stock Batch", href: "/inventory/stockbatch", icon: <FaBoxes size={18} />, subtitle: "Batches" },
+                { title: "Expired Stocks", href: "/inventory/expired-stocks", icon: <FaBoxes size={18} />, subtitle: "Expired" },
+                { title: "Low Stocks", href: "/inventory/low-stocks", icon: <FaBoxes size={18} />, subtitle: "Low" },
+                { title: "Auto Book", href: "/inventory/auto-book", icon: <FaCalendarAlt size={18} />, subtitle: "Reorder" },
+            ]
+        }
+    ],
+    pharmacist: [
+        {
+            title: "Pharmacy", items: [
+                { title: "Dashboard", href: "/pharmacy", icon: <FaPrescriptionBottleAlt size={18} />, subtitle: "Overview" },
+                { title: "Stock", href: "/pharmacy/stock", icon: <FaPrescriptionBottleAlt size={18} />, subtitle: "Inventory" },
+                { title: "Dispense", href: "/pharmacy/invoice", icon: <FaFileInvoiceDollar size={18} />, subtitle: "Billing" },
+                { title: "History", href: "/pharmacy/history", icon: <FaFileMedical size={18} />, subtitle: "Logs" },
+            ]
+        }
     ]
 };
 
@@ -120,7 +169,19 @@ function SidebarCard({ icon, title, subtitle, href, isOpen, isActive }) {
 export default function Sidebar({ role = "patient" }) {
     const pathname = usePathname();
     const roleLabel =
-        role === "admin" ? "Hospital Admin" : role === "super_admin" ? "Super Admin" : role;
+        role === "admin"
+            ? "Hospital Admin"
+            : role === "super_admin"
+            ? "Super Admin"
+            : role === "register"
+            ? "Reception"
+            : role === "accountant"
+            ? "Accountant"
+            : role === "inventory"
+            ? "Inventory"
+            : role === "pharmacist"
+            ? "Pharmacy"
+            : role;
     // Default open on desktop
     const [isOpen, setIsOpen] = useState(true);
 
@@ -167,31 +228,31 @@ export default function Sidebar({ role = "patient" }) {
 
             <aside
                 className={`
-                    fixed md:sticky top-0 left-0 h-screen pt-[125px] md:pt-0 bg-white border-r border-slate-200 shadow-sm z-40 transition-all duration-300 flex flex-col
+                    fixed md:sticky top-0 left-0 h-screen pt-[125px] md:pt-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm z-40 transition-all duration-300 flex flex-col
                     ${isOpen ? "w-64" : "w-20 md:w-20 w-0 -translate-x-full md:translate-x-0"}
                 `}
             >
                 {/* Header */}
-                <div className="h-12 flex items-center justify-between px-4 mb-2 shrink-0">
+                <div className="h-12 flex items-center justify-between px-4 mb-2 shrink-0 border-b border-slate-200 dark:border-slate-800">
                     <button
                         onClick={toggleSidebar}
-                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition"
+                        className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-300 transition"
                     >
                         <FaBars size={18} />
                     </button>
                     {isOpen && (
-                        <span className="font-bold text-lg text-slate-800 tracking-tight capitalize mr-auto ml-3">
+                        <span className="font-bold text-lg text-slate-800 dark:text-slate-100 tracking-tight capitalize mr-auto ml-3">
                             {roleLabel} Portal
                         </span>
                     )}
                 </div>
 
                 {/* Menu */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-3 space-y-6 custom-scrollbar">
                     {sections.map((section, idx) => (
                         <div key={idx}>
                             {isOpen && (
-                                <h3 className="px-1 mb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                <h3 className="px-1 mb-2 text-[11px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">
                                     {section.title}
                                 </h3>
                             )}
@@ -210,15 +271,15 @@ export default function Sidebar({ role = "patient" }) {
                 </div>
 
                 {/* Footer (Logout) */}
-                <div className="p-4 border-t border-slate-100 shrink-0 bg-slate-50/50">
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/40">
                     {isOpen && (
                         <div className="px-1 mb-3 flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
                                 {roleLabel.charAt(0)}
                             </div>
                             <div className="overflow-hidden">
-                                <p className="text-xs font-bold text-slate-700">{roleLabel}</p>
-                                <p className="text-[10px] text-slate-500 truncate">Logged In</p>
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{roleLabel}</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Logged In</p>
                             </div>
                         </div>
                     )}
