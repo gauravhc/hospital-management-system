@@ -229,8 +229,8 @@ const PatientScanDocumentsPage = () => {
 
         {/* CAMERA MODAL */}
         {showCamera && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-white p-5 rounded-2xl shadow-xl w-[350px] relative">
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-xl w-full max-w-sm relative">
               <button
                 onClick={stopCamera}
                 className="absolute top-3 right-3 text-slate-500 hover:text-black"
@@ -246,7 +246,7 @@ const PatientScanDocumentsPage = () => {
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className="w-full h-[260px] bg-black rounded-lg"
+                className="w-full h-56 sm:h-[260px] bg-black rounded-lg max-w-full"
               />
 
               <canvas ref={canvasRef} className="hidden"></canvas>

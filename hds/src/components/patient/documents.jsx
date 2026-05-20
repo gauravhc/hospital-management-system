@@ -82,7 +82,7 @@ export default function PatientDocumentsPage() {
 
   return (
     <div className="space-y-6 bg-slate-50 p-6">
-      <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-blue-700 p-8 text-white shadow-lg">
+      <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-blue-700 p-4 sm:p-8 text-white shadow-lg">
         <h1 className="text-3xl font-bold">Medical Documents</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-200">
           Upload prescriptions, reports, discharge summaries, and other medical files.

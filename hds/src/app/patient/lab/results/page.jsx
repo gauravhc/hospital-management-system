@@ -33,15 +33,15 @@ export default function PatientLabResultsPage() {
   return (
     <div className="bg-slate-50 min-h-screen">
       <main
-        className="px-6 py-8"
+        className="px-4 sm:px-6 py-6 sm:py-8"
         style={{
           backgroundImage: "url('/images/Bg-image.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
-        <div className="max-w-5xl mx-auto bg-white/90 border rounded-2xl shadow-xl p-8">
-          <h1 className="text-3xl font-extrabold text-slate-900">Lab Results</h1>
+        <div className="max-w-5xl mx-auto bg-white/90 border rounded-2xl shadow-xl p-4 sm:p-8 max-w-full">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Lab Results</h1>
           <p className="text-slate-600 mt-2">
             Your uploaded and processed reports will appear here.
           </p>
@@ -49,7 +49,7 @@ export default function PatientLabResultsPage() {
           <div className="mt-6 space-y-4">
             {reports.length ? (
               reports.map((report) => (
-                <div key={report.id || report.report_id} className="rounded-xl border p-5 bg-white">
+                <div key={report.id || report.report_id} className="rounded-xl border p-4 sm:p-5 bg-white">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-slate-700 font-semibold">

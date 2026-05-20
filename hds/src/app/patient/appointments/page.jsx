@@ -33,14 +33,14 @@ export default function PatientAppointmentsPage() {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">My Appointments</h1>
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 max-w-full">
+      <h1 className="text-xl sm:text-2xl font-bold mb-4">My Appointments</h1>
 
       {loading ? <p>Loading...</p> : null}
       {error ? <p className="text-red-600">{error}</p> : null}
 
       <div className="overflow-x-auto border rounded-xl bg-white">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs sm:text-sm">
           <thead className="bg-slate-50">
             <tr>
               <th className="p-2 text-left">ID</th>

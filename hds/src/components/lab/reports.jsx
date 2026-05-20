@@ -5,7 +5,7 @@ import { apiGet } from "@/services/api";
 import backendUrl from "@/lib/backendUrl";
 
 const pageShell = "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.08),_transparent_32%),linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)]";
-const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
+const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-4 sm:p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
 
 const normalizeStatus = (value) => {
   const raw = String(value || "").trim().toLowerCase();

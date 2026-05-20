@@ -38,7 +38,7 @@ const formatDateTime = (value) => {
 
 const pageShell = "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.08),_transparent_30%),linear-gradient(180deg,#fafaff_0%,#eef3ff_100%)] p-4 md:p-6 print:bg-white";
 const pageContent = "mx-auto w-full max-w-7xl space-y-6";
-const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur print:shadow-none";
+const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-4 sm:p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur print:shadow-none";
 const insetCard = "rounded-2xl border border-slate-200/80 bg-slate-50/90 p-4";
 
 export default function ReportPage() {

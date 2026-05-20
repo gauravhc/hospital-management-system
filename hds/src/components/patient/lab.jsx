@@ -7,10 +7,10 @@ import { apiGet } from "@/services/api";
 import { LAB_TEST_CATEGORIES } from "@/data/labTests";
 
 const Hero = ({ pending, claims }) => (
-  <div className="rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white p-8 shadow-lg mb-6">
+  <div className="rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 text-white p-4 sm:p-8 shadow-lg mb-6">
     <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
       <div>
-        <h2 className="text-3xl md:text-4xl font-extrabold">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold">
           Lab Tests & Reports
         </h2>
         <p className="mt-2 text-sky-100/90">
@@ -32,12 +32,12 @@ const Hero = ({ pending, claims }) => (
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="bg-white/10 rounded-lg p-4 w-40">
+      <div className="flex flex-wrap gap-4 w-full md:w-auto">
+        <div className="bg-white/10 rounded-lg p-4 w-full sm:w-40">
           <div className="text-xs text-white/80">Pending Reports</div>
           <div className="text-2xl font-bold">{pending}</div>
         </div>
-        <div className="bg-white/10 rounded-lg p-4 w-40">
+        <div className="bg-white/10 rounded-lg p-4 w-full sm:w-40">
           <div className="text-xs text-white/80">Active Claims</div>
           <div className="text-2xl font-bold">{claims}</div>
         </div>

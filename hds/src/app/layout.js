@@ -11,10 +11,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased text-gray-700 bg-gray-50" suppressHydrationWarning>
+      <body className="antialiased text-gray-700 bg-gray-50 overflow-x-hidden" suppressHydrationWarning>
         <AuthProvider>
           <Header />
-          <main className="min-h-screen">
+          <main className="min-h-screen w-full max-w-full min-w-0">
             {children}
           </main>
           <Footer />

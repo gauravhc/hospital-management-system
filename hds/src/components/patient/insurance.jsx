@@ -160,7 +160,7 @@ export default function PatientInsurancePage() {
 
   return (
     <div className="min-h-screen space-y-6 bg-slate-50 p-6">
-      <div className="rounded-3xl bg-gradient-to-r from-rose-500 via-fuchsia-500 to-indigo-500 p-8 text-white shadow-lg">
+      <div className="rounded-3xl bg-gradient-to-r from-rose-500 via-fuchsia-500 to-indigo-500 p-4 sm:p-8 text-white shadow-lg">
         <h1 className="flex items-center gap-3 text-3xl font-bold">
           <ShieldCheck />
           Insurance

@@ -59,17 +59,17 @@ export default function PatientLabOrderPage() {
   return (
     <div className="bg-slate-50 min-h-screen">
       <main
-        className="px-6 py-8"
+        className="px-4 sm:px-6 py-6 sm:py-8"
         style={{
           backgroundImage: "url('/images/Bg-image.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
-        <div className="max-w-4xl mx-auto bg-white/90 border rounded-2xl shadow-xl p-8">
+        <div className="max-w-4xl mx-auto bg-white/90 border rounded-2xl shadow-xl p-4 sm:p-8 max-w-full">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-extrabold text-slate-900">Book Lab Test</h1>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900">Book Lab Test</h1>
               <p className="text-slate-600 mt-2">Select a test and book it. No payment required.</p>
             </div>
             <Link href="/patient/lab" className="text-sky-700 font-semibold hover:underline">
@@ -111,7 +111,7 @@ export default function PatientLabOrderPage() {
             </div>
           ) : (
             <div className="mt-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
-              <section className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-6">
+              <section className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-slate-900">Booking summary</h2>
                 <div className="mt-4 space-y-2 text-sm text-slate-700">
                   <div className="flex items-center justify-between gap-4">
@@ -148,7 +148,7 @@ export default function PatientLabOrderPage() {
                 ) : null}
               </section>
 
-              <section className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6">
+              <section className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
                 <h2 className="text-lg font-bold text-slate-900">Confirm</h2>
                 <p className="mt-2 text-sm text-slate-600">
                   This will create a lab booking request. Payment is not required.

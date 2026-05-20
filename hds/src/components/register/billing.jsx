@@ -17,7 +17,7 @@ const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString("en-I
 const formatStatusLabel = (value) => String(value || "unknown").replace(/_/g, " ");
 const pageShell = "min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_32%),linear-gradient(180deg,#f7fcfb_0%,#edf7f5_100%)] p-4 md:p-6";
 const pageContent = "mx-auto w-full max-w-7xl space-y-6";
-const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
+const surfaceCard = "rounded-[28px] border border-white/70 bg-white/95 p-4 sm:p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
 
 export default function BillingPage() {
   const router = useRouter();

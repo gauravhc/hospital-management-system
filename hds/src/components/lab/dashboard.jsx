@@ -14,7 +14,7 @@ import {
 
 const pageShell = "min-h-screen bg-white";
 const surfaceCard =
-  "rounded-[28px] border border-white/70 bg-white/95 p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
+  "rounded-[28px] border border-white/70 bg-white/95 p-4 sm:p-6 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.28)] backdrop-blur";
 
 const normalizeStatus = (value) => {
   const raw = String(value || "pending").trim().toLowerCase();

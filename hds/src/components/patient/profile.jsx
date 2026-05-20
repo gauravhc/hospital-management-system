@@ -10,7 +10,7 @@ import { API_BASE_URL } from "@/lib/apiBaseUrl";
 const inputClass =
   "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
-const sectionClass = "rounded-3xl border border-slate-200 bg-white p-6 shadow-sm";
+const sectionClass = "rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm";
 
 export default function PatientProfilePage() {
   const [profile, setProfile] = useState({
@@ -175,7 +175,7 @@ export default function PatientProfilePage() {
 
   return (
     <div className="space-y-6 bg-slate-50 p-6">
-      <div className="rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 p-8 text-white shadow-lg">
+      <div className="rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 p-4 sm:p-8 text-white shadow-lg">
         <h1 className="text-3xl font-bold">Patient Profile</h1>
         <p className="mt-2 max-w-2xl text-sm text-blue-100">
           View and update your personal information, medical details, emergency contact, and profile image.

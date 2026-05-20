@@ -90,23 +90,23 @@ const Header = () => {
     };
 
     return (
-        <header className="w-full z-50 sticky top-[-70px] sm:top-[-46px]">
+        <header className={`relative w-full z-50 sticky top-[-70px] sm:top-[-46px] ${isDashboardRoute ? "hidden md:block" : ""}`}>
             {/* Top Bar - Black background as per image */}
-            <div className="bg-black text-white py-2.5 block transition-all duration-300 h-auto sm:h-[46px]">
-                <div className="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center text-sm font-medium">
-                    <div className="flex items-center gap-6 mb-2 sm:mb-0">
-                        <div className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors">
+            <div className={`bg-black text-white py-2.5 transition-all duration-300 h-auto sm:h-[46px] ${isDashboardRoute ? "hidden md:block" : "block"}`}>
+                <div className="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs sm:text-sm font-medium gap-2 sm:gap-0">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:gap-6">
+                        <div className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors min-w-0">
                             <Mail size={14} className="text-[#0E82FD]" />
-                            <span>info@example.com</span>
+                            <span className="truncate max-w-[70vw] sm:max-w-none">info@example.com</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors">
+                        <div className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors min-w-0">
                             <Phone size={14} className="text-[#0E82FD]" />
-                            <span>+1 56654 65656</span>
+                            <span className="truncate max-w-[60vw] sm:max-w-none">+1 56654 65656</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-300">
+                    <div className="flex items-center gap-2 text-gray-300 min-w-0">
                         <Clock size={14} className="text-[#0E82FD]" />
-                        <span>Monday - Friday, 8 AM to 10 PM</span>
+                        <span className="truncate max-w-[80vw] sm:max-w-none">Monday - Friday, 8 AM to 10 PM</span>
                     </div>
                 </div>
             </div>
@@ -116,21 +116,21 @@ const Header = () => {
                 <div className="w-full px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-20">
                         {/* Logo */}
-                        <div className="flex-shrink-0 flex items-center">
-                            <Link href="/" className="flex items-center h-full">
+                        <div className="flex-shrink-0 flex items-center min-w-0">
+                            <Link href="/" className="flex items-center h-full min-w-0">
                                 {isDashboardRoute ? (
-                                    <span className="font-bold text-2xl text-[#1B2559] flex items-center gap-2">
+                                    <span className="font-bold text-lg sm:text-2xl text-[#1B2559] flex items-center gap-2 min-w-0">
                                         <Image
                                             src={LOGO_SRC}
                                             alt="Medicore Vault"
                                             width={64}
                                             height={64}
-                                            className="w-[64px] h-[64px] object-contain"
+                                            className="w-10 h-10 sm:w-[64px] sm:h-[64px] object-contain shrink-0"
                                             priority
-                                            sizes="64px"
+                                            sizes="(max-width: 640px) 40px, 64px"
                                             unoptimized
                                         />
-                                        Medicore vault
+                                        <span className="truncate">Medicore vault</span>
                                     </span>
                                 ) : (
                                     <Image
@@ -206,7 +206,7 @@ const Header = () => {
                         <div className="lg:hidden flex items-center">
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
-                                className="text-gray-600 hover:text-gray-900 focus:outline-none"
+                                className="p-2 -mr-2 text-gray-600 hover:text-gray-900 focus:outline-none"
                             >
                                 {isOpen ? <X size={24} /> : <Menu size={24} />}
                             </button>
@@ -217,7 +217,7 @@ const Header = () => {
 
             {/* Mobile Navigation */}
             {isOpen && (
-                <div className="lg:hidden bg-white border-t border-gray-100 absolute w-full shadow-xl">
+                <div className="lg:hidden bg-white border-t border-gray-100 absolute left-0 right-0 w-full max-w-full shadow-xl">
                     <div className="px-4 pt-2 pb-6 space-y-1">
                         {navItems.map((item) => (
                             <Link

@@ -6,7 +6,7 @@ const IDCard = ({ employee }) => {
     if (!employee) return null;
 
     return (
-        <div className="w-[350px] h-[520px] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 font-sans relative">
+        <div className="w-full max-w-[350px] aspect-[350/520] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 font-sans relative">
             {/* Background Pattern */}
             <div className="absolute top-0 left-0 w-full h-[180px] bg-blue-600 rounded-b-[50%] z-0"></div>
 

@@ -243,13 +243,13 @@ export default function PatientDashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/20 bg-white/95 p-6 shadow-xl lg:col-span-2">
-            <h3 className="mb-4 text-2xl font-semibold text-slate-900">Vital Signs</h3>
+          <div className="rounded-[28px] border border-white/20 bg-white/95 p-4 sm:p-6 shadow-xl lg:col-span-2">
+            <h3 className="mb-4 text-xl sm:text-2xl font-semibold text-slate-900">Vital Signs</h3>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               {Object.entries(vitals).map(([key, value]) => (
-                <div key={key} className="rounded-2xl bg-sky-50 p-5">
-                  <p className="text-sm capitalize text-slate-600">{key.replace(/([A-Z])/g, " $1")}</p>
-                  <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+                <div key={key} className="rounded-2xl bg-sky-50 p-4 sm:p-5">
+                  <p className="text-xs sm:text-sm capitalize text-slate-600">{key.replace(/([A-Z])/g, " $1")}</p>
+                  <p className="mt-2 text-lg sm:text-2xl font-bold text-slate-900">{value}</p>
                 </div>
               ))}
             </div>
@@ -257,37 +257,37 @@ export default function PatientDashboardPage() {
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="rounded-[24px] bg-sky-50 p-6 shadow-xl">
-            <p className="text-sm text-slate-600">Upcoming Appointments ({upcomingCount})</p>
+          <div className="rounded-[24px] bg-sky-50 p-4 sm:p-6 shadow-xl">
+            <p className="text-xs sm:text-sm text-slate-600">Upcoming Appointments ({upcomingCount})</p>
             {upcomingAppointment ? (
               <div className="mt-3">
-                <p className="text-4xl font-bold text-slate-900">
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900">
                   {new Date(upcomingAppointment.date || upcomingAppointment.appointment_date).getDate()}
                 </p>
-                <p className="text-lg font-semibold text-slate-900">
+                <p className="text-base sm:text-lg font-semibold text-slate-900">
                   {new Date(upcomingAppointment.date || upcomingAppointment.appointment_date).toLocaleDateString("en-IN", {
                     month: "short",
                     year: "numeric",
                   })}
                 </p>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-xs sm:text-sm text-slate-600 break-words">
                   Doctor: {upcomingAppointment.doctorName || upcomingAppointment.doctor_name || "--"}
                 </p>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-slate-600">No upcoming appointments</p>
+              <p className="mt-4 text-xs sm:text-sm text-slate-600">No upcoming appointments</p>
             )}
           </div>
 
-          <div className="rounded-[24px] bg-amber-50 p-6 shadow-xl">
-            <p className="text-sm text-slate-600">Pending Lab Reports</p>
-            <p className="mt-4 text-4xl font-bold text-slate-900">0</p>
-            <p className="mt-2 text-sm text-slate-600">pending</p>
+          <div className="rounded-[24px] bg-amber-50 p-4 sm:p-6 shadow-xl">
+            <p className="text-xs sm:text-sm text-slate-600">Pending Lab Reports</p>
+            <p className="mt-4 text-3xl sm:text-4xl font-bold text-slate-900">0</p>
+            <p className="mt-2 text-xs sm:text-sm text-slate-600">pending</p>
           </div>
 
-          <div className="rounded-[24px] bg-emerald-50 p-6 shadow-xl">
-            <p className="text-sm text-slate-600">Active Claims</p>
-            <p className="mt-4 text-2xl font-bold text-slate-900">No active claims</p>
+          <div className="rounded-[24px] bg-emerald-50 p-4 sm:p-6 shadow-xl">
+            <p className="text-xs sm:text-sm text-slate-600">Active Claims</p>
+            <p className="mt-4 text-lg sm:text-2xl font-bold text-slate-900 break-words">No active claims</p>
           </div>
         </div>
 
@@ -296,7 +296,7 @@ export default function PatientDashboardPage() {
             <Link key={card.id} href={card.href} className="block">
               <div className="overflow-hidden rounded-[24px] border border-white/20 shadow-xl transition hover:-translate-y-1">
                 <div className={`h-full w-2 ${card.accent} float-left`} />
-                <div className="bg-white/95 p-6">
+                <div className="bg-white/95 p-4 sm:p-6">
                   <div className="flex items-start gap-4">
                     <div className={`rounded-2xl p-3 ${card.box}`}>
                       <card.icon className="h-7 w-7" />
