@@ -374,9 +374,9 @@ export default function SuperAdminDashboard() {
   };
 
   return (
-    <div className="space-y-6 min-h-screen p-4 md:p-6 bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-100">
-      <div className="bg-gradient-to-r from-slate-900 via-cyan-900 to-indigo-900 text-white rounded-2xl p-6 shadow-xl border border-white/15">
-        <h1 className="text-3xl font-bold">Super Admin Control Center</h1>
+    <div className="space-y-6 min-h-screen p-4 md:p-6 bg-gradient-to-br from-sky-50 via-cyan-50 to-indigo-100 max-w-full">
+      <div className="bg-gradient-to-r from-slate-900 via-cyan-900 to-indigo-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-white/15">
+        <h1 className="text-2xl sm:text-3xl font-bold break-words">Super Admin Control Center</h1>
         <p className="opacity-90">Create hospitals and super admins, then open a hospital to manage its modules.</p>
         <p className="mt-2 text-xs opacity-75">
           Live sync {lastSyncedAt ? `at ${lastSyncedAt.toLocaleTimeString()}` : "pending..."}
@@ -384,12 +384,12 @@ export default function SuperAdminDashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl">
+        <div className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-4 sm:p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-sky-600 to-cyan-600 opacity-[0.10] transition group-hover:opacity-[0.16]" />
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Quick Action</p>
-              <h2 className="mt-2 text-3xl font-extrabold text-slate-900">Add Hospital</h2>
+              <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 break-words">Add Hospital</h2>
               <p className="mt-1 text-sm text-slate-600">Create a hospital, then open it to manage modules.</p>
               <p className="mt-4 text-sm font-semibold text-indigo-700">Total hospitals: {derivedStats.hospitals}</p>
             </div>
@@ -402,7 +402,7 @@ export default function SuperAdminDashboard() {
             <button
               type="button"
               onClick={openCreateHospital}
-              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#4f46e5,#06b6d4)] px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-cyan-200/50 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 active:translate-y-0"
+              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#4f46e5,#06b6d4)] px-4 py-2.5 text-xs sm:px-5 sm:py-3 sm:text-sm font-extrabold text-white shadow-lg shadow-cyan-200/50 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 active:translate-y-0"
             >
               <Building2 size={18} />
               Add Hospital
@@ -410,12 +410,12 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl">
+        <div className="group relative overflow-hidden rounded-3xl border border-white/50 bg-white/80 p-4 sm:p-6 text-left shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:shadow-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600 via-violet-600 to-indigo-600 opacity-[0.10] transition group-hover:opacity-[0.16]" />
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Quick Action</p>
-              <h2 className="mt-2 text-3xl font-extrabold text-slate-900">Create Super Admin</h2>
+              <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 break-words">Create Super Admin</h2>
               <p className="mt-1 text-sm text-slate-600">Add a super admin for platform-level access.</p>
               <p className="mt-4 text-sm font-semibold text-fuchsia-700">Total super admins: {derivedStats.superAdmins}</p>
             </div>
@@ -428,7 +428,7 @@ export default function SuperAdminDashboard() {
             <button
               type="button"
               onClick={openCreateSuperAdmin}
-              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#d946ef,#4f46e5)] px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-fuchsia-200/50 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/70 active:translate-y-0"
+              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#d946ef,#4f46e5)] px-4 py-2.5 text-xs sm:px-5 sm:py-3 sm:text-sm font-extrabold text-white shadow-lg shadow-fuchsia-200/50 transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/70 active:translate-y-0"
             >
               <UserPlus size={18} />
               Create Super Admin
@@ -439,8 +439,8 @@ export default function SuperAdminDashboard() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-white/80 backdrop-blur-md shadow-xl rounded-2xl p-6 border border-white/60">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-700">Hospitals</h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-700">Hospitals</h2>
             <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
               <Sparkles size={14} />
               Click a hospital to open modules
@@ -448,7 +448,7 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1100px] text-xs sm:text-sm">
               <thead className="bg-slate-50 text-gray-700">
                 <tr>
                   <th className="p-3 text-left">Hospital</th>

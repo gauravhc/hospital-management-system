@@ -20,14 +20,14 @@ export default function MobileTabNav({ navItems = [], title = "Dashboard", usern
                             alt="Medicore Vault - Secure Care, Limitless Trust"
                             width={64}
                             height={64}
-                            className="object-contain w-10 h-10 sm:w-12 sm:h-12"
+                            className="object-contain w-9 h-9 sm:w-11 sm:h-11"
                             priority
-                            sizes="(max-width: 640px) 40px, 48px"
+                            sizes="(max-width: 640px) 36px, 44px"
                             unoptimized
                         />
                     </Link>
                     <div className="min-w-0">
-                        <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight capitalize truncate">{title}</h1>
+                        <h1 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 leading-tight capitalize truncate">{title}</h1>
                         <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">Welcome, {username}</p>
                     </div>
                 </div>

@@ -10,6 +10,7 @@ const Header = () => {
     const [isOpen, setIsOpen] = useState(false);
     const pathname = usePathname();
     const [isScrolled, setIsScrolled] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const { user, logout } = useAuth();
 
     const LOGO_SRC = "/logo.png";
@@ -26,6 +27,22 @@ const Header = () => {
         pathname?.startsWith("/accountant") ||
         pathname?.startsWith("/hr") ||
         pathname?.startsWith("/insurance");
+
+    useEffect(() => {
+        const media = window.matchMedia("(max-width: 767px)");
+        const sync = () => setIsMobile(Boolean(media.matches));
+        sync();
+        if (typeof media.addEventListener === "function") {
+            media.addEventListener("change", sync);
+            return () => media.removeEventListener("change", sync);
+        }
+        media.addListener(sync);
+        return () => media.removeListener(sync);
+    }, []);
+
+    if (isDashboardRoute && isMobile) {
+        return null;
+    }
 
     useEffect(() => {
         const handleScroll = () => {
@@ -90,7 +107,7 @@ const Header = () => {
     };
 
     return (
-        <header className={`relative w-full z-50 sticky top-[-70px] sm:top-[-46px] ${isDashboardRoute ? "hidden md:block" : ""}`}>
+        <header className="relative w-full z-50 sticky top-0 sm:top-[-70px] md:top-[-46px]">
             {/* Top Bar - Black background as per image */}
             <div className={`bg-black text-white py-2.5 transition-all duration-300 h-auto sm:h-[46px] ${isDashboardRoute ? "hidden md:block" : "block"}`}>
                 <div className="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs sm:text-sm font-medium gap-2 sm:gap-0">
@@ -114,7 +131,7 @@ const Header = () => {
             {/* Main Navigation */}
             <div className={`bg-white border-b border-gray-100 transition-all duration-300 ${isScrolled ? 'shadow-md' : ''}`}>
                 <div className="w-full px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-20">
+                    <div className="flex justify-between items-center h-16 sm:h-20 gap-3">
                         {/* Logo */}
                         <div className="flex-shrink-0 flex items-center min-w-0">
                             <Link href="/" className="flex items-center h-full min-w-0">
@@ -138,7 +155,7 @@ const Header = () => {
                                         alt="Medicore Vault - Secure Care, Limitless Trust"
                                         width={180}
                                         height={70}
-                                        className="block w-auto h-16 sm:h-[4.5rem] max-w-[56vw] sm:max-w-none object-contain object-left"
+                                        className="block w-auto h-10 sm:h-[4.5rem] max-w-[62vw] sm:max-w-none object-contain object-left"
                                         priority
                                         sizes="(max-width: 640px) 185px, (max-width: 1024px) 210px, 235px"
                                         unoptimized
@@ -203,7 +220,7 @@ const Header = () => {
                         </div>
 
                         {/* Mobile menu button */}
-                        <div className="lg:hidden flex items-center">
+                        <div className="lg:hidden flex items-center shrink-0">
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
                                 className="p-2 -mr-2 text-gray-600 hover:text-gray-900 focus:outline-none"
@@ -217,7 +234,7 @@ const Header = () => {
 
             {/* Mobile Navigation */}
             {isOpen && (
-                <div className="lg:hidden bg-white border-t border-gray-100 absolute left-0 right-0 w-full max-w-full shadow-xl">
+                <div className="lg:hidden bg-white border-t border-gray-100 relative w-full max-w-full shadow-xl overflow-x-hidden">
                     <div className="px-4 pt-2 pb-6 space-y-1">
                         {navItems.map((item) => (
                             <Link

@@ -132,12 +132,12 @@ export default function PatientDashboardPage() {
   }, [profile]);
 
   return (
-    <div className="w-full bg-transparent p-6">
+    <div className="w-full max-w-full min-w-0 bg-transparent p-4 sm:p-6">
       <div className="min-h-screen">
-        <div className="mb-6 rounded-[30px] border border-white/30 bg-white/95 p-6 shadow-xl">
+        <div className="mb-6 rounded-[30px] border border-white/30 bg-white/95 p-4 sm:p-6 shadow-xl">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex w-full items-center gap-5">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[20px] bg-slate-200 text-3xl font-bold text-slate-500 shadow-inner">
+            <div className="flex w-full items-center gap-4 min-w-0">
+              <div className="flex h-16 w-16 sm:h-24 sm:w-24 items-center justify-center overflow-hidden rounded-[20px] bg-slate-200 text-2xl sm:text-3xl font-bold text-slate-500 shadow-inner shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
                 ) : (
@@ -145,12 +145,12 @@ export default function PatientDashboardPage() {
                 )}
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-slate-500">
                   Patient ID: <span className="font-semibold text-sky-500">#{patientId || "--"}</span>
                 </p>
-                <h2 className="text-3xl font-extrabold text-slate-800">
-                  {greeting}, <span className="text-sky-500">{displayName}</span>
+                <h2 className="text-xl sm:text-3xl font-extrabold text-slate-800 break-words">
+                  {greeting}, <span className="text-sky-500 break-words">{displayName}</span>
                 </h2>
                 <p className="text-sm text-slate-500">Welcome back — your dashboard</p>
               </div>
@@ -159,7 +159,7 @@ export default function PatientDashboardPage() {
             <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">
               <Link
                 href="/patient/profile"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-6 py-4 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 sm:px-6 sm:py-4 text-sm font-medium text-slate-800 transition hover:bg-slate-50 w-full sm:w-auto"
               >
                 <User size={18} />
                 Profile
@@ -167,7 +167,7 @@ export default function PatientDashboardPage() {
               <button
                 type="button"
                 onClick={() => router.push("/appointment")}
-                className="rounded-2xl bg-sky-600 px-7 py-4 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700"
+                className="rounded-2xl bg-sky-600 px-5 py-3 sm:px-7 sm:py-4 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700 w-full sm:w-auto"
               >
                 Book Appointment
               </button>
@@ -175,7 +175,7 @@ export default function PatientDashboardPage() {
           </div>
         </div>
 
-        <div className="mb-6 rounded-[28px] border border-red-100 bg-red-50/80 p-6 shadow-xl">
+        <div className="mb-6 rounded-[28px] border border-red-100 bg-red-50/80 p-4 sm:p-6 shadow-xl">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Ambulance</p>

@@ -349,14 +349,14 @@ export default function DoctorPage() {
 
       {/* MAIN CONTENT AREA */}
       <main
-        className={`flex-1 px-6 py-8 ${isDark ? "bg-slate-900" : "bg-white"}`}
+        className={`flex-1 px-4 sm:px-6 py-6 sm:py-8 max-w-full ${isDark ? "bg-slate-900" : "bg-white"}`}
       >
 
         {/* HEADER */}
-        <div className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between mb-6 border border-white/20 gap-4 md:gap-0">
+        <div className="bg-white dark:bg-slate-800 shadow-xl rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between mb-6 border border-white/20 gap-4 md:gap-0 max-w-full min-w-0">
 
           {/* Left: Avatar & Greeting */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-5 w-full md:w-auto text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-5 w-full md:w-auto text-center sm:text-left min-w-0">
             <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center shadow-inner border border-slate-100">
               {avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -375,11 +375,11 @@ export default function DoctorPage() {
               </button>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Doctor Dashboard
               </p>
-              <h2 className="text-xl md:text-3xl font-extrabold text-slate-800 dark:text-white">
+              <h2 className="text-lg sm:text-xl md:text-3xl font-extrabold text-slate-800 dark:text-white break-words">
                 {greeting}, <span className="text-sky-600 dark:text-sky-400">Dr. {formatName(username)}</span>
               </h2>
               {doctorId ? (

@@ -342,7 +342,7 @@ export default function NurseDashboard() {
 
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 min-w-0">
               <div className="w-14 h-14 rounded-full bg-sky-600 flex items-center justify-center text-white text-xl font-bold shadow-md overflow-hidden">
                 {avatarUrl && !avatarFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -356,9 +356,9 @@ export default function NurseDashboard() {
                   <span>{String(username || "N").charAt(0)}</span>
                 )}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Nurse Dashboard</p>
-                <h2 className="text-2xl font-extrabold text-slate-800 dark:text-white">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 dark:text-white break-words">
                   {greeting}, {profileLoading ? "..." : username}
                 </h2>
                 {nurseId ? (

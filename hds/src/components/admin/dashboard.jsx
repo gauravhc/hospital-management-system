@@ -510,7 +510,7 @@ export default function HRDashboard() {
     <div className="max-w-7xl mx-auto pb-20">
 
       {/* SEARCH BAR SECTION */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-10 text-center relative overflow-hidden">
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-8 mb-10 text-center relative overflow-hidden max-w-full">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
 
         {portalTitle === "Hospital Admin Directory Search" && hospitalBrand.name && (
@@ -537,7 +537,7 @@ export default function HRDashboard() {
           </div>
         )}
 
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">{portalTitle}</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2 break-words">{portalTitle}</h2>
         <p className="text-gray-500 mb-6 max-w-lg mx-auto">Find and manage employee details, print ID cards, or verify information comfortably.</p>
 
         <form onSubmit={handleSearch} className="flex justify-center max-w-md mx-auto relative">
@@ -554,7 +554,7 @@ export default function HRDashboard() {
           <button
             type="submit"
             disabled={loadingSearch}
-            className="absolute right-2 top-2 bottom-2 bg-blue-600 text-white px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-70 transition-colors"
+            className="mt-3 w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-70 transition-colors sm:mt-0 sm:w-auto sm:absolute sm:right-2 sm:top-2 sm:bottom-2 sm:px-6 sm:py-0"
           >
             {loadingSearch ? "..." : "Search"}
           </button>
