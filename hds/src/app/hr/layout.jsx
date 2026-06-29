@@ -1,9 +1,53 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import MobileTabNav from "@/components/layout/MobileTabNav";
 import HRSidebar from "@/components/hr/HRSidebar";
+
+const subscribeToHRAuthChanges = (callback) => {
+  if (typeof window === "undefined") return () => {};
+
+  const onStorage = (event) => {
+    if (event.key === "token" || event.key === "role" || event.key === "username") callback();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+};
+
+let cachedHRToken = null;
+let cachedHRRole = null;
+let cachedHRUsername = null;
+let cachedHRSnapshot = null;
+
+const readHRAuthSnapshot = () => {
+  if (typeof window === "undefined") return SERVER_HR_AUTH_SNAPSHOT;
+
+  const token = localStorage.getItem("token");
+  const role = (localStorage.getItem("role") || "").toLowerCase();
+  const username = localStorage.getItem("username") || "";
+
+  if (token === cachedHRToken && role === cachedHRRole && username === cachedHRUsername && cachedHRSnapshot) {
+    return cachedHRSnapshot;
+  }
+
+  const allowed =
+    Boolean(token) &&
+    (role === "hr" ||
+      role === "hrmanager" ||
+      role === "hospital_admin" ||
+      role === "admin" ||
+      role === "super_admin");
+
+  cachedHRToken = token;
+  cachedHRRole = role;
+  cachedHRUsername = username;
+  cachedHRSnapshot = { checked: true, allowed, username };
+  return cachedHRSnapshot;
+};
+
+const SERVER_HR_AUTH_SNAPSHOT = { checked: false, allowed: false, username: "" };
+const readServerHRAuthSnapshot = () => SERVER_HR_AUTH_SNAPSHOT;
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/hr" },
@@ -16,23 +60,11 @@ const NAV_ITEMS = [
 export default function HRLayout({ children }) {
   const router = useRouter();
 
-  const auth = useMemo(() => {
-    if (typeof window === "undefined") return { checked: false, allowed: false, username: "" };
-
-    const token = localStorage.getItem("token");
-    const role = (localStorage.getItem("role") || "").toLowerCase();
-    const username = localStorage.getItem("username") || "";
-
-    const allowed =
-      Boolean(token) &&
-      (role === "hr" ||
-        role === "hrmanager" ||
-        role === "hospital_admin" ||
-        role === "admin" ||
-        role === "super_admin");
-
-    return { checked: true, allowed, username };
-  }, []);
+  const auth = useSyncExternalStore(
+    subscribeToHRAuthChanges,
+    readHRAuthSnapshot,
+    readServerHRAuthSnapshot
+  );
 
   useEffect(() => {
     if (auth.checked && !auth.allowed) router.push("/login");

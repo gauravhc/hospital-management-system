@@ -1,8 +1,47 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+
+const subscribeToPharmacyAuthChanges = (callback) => {
+  if (typeof window === "undefined") return () => {};
+
+  const onStorage = (event) => {
+    if (event.key === "token" || event.key === "role") callback();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+};
+
+let cachedPharmacyToken = null;
+let cachedPharmacyRole = null;
+let cachedPharmacySnapshot = null;
+
+const readPharmacyAuthSnapshot = () => {
+  if (typeof window === "undefined") return SERVER_PHARMACY_AUTH_SNAPSHOT;
+  const token = localStorage.getItem("token");
+  const role = (localStorage.getItem("role") || "").toLowerCase();
+
+  if (token === cachedPharmacyToken && role === cachedPharmacyRole && cachedPharmacySnapshot) {
+    return cachedPharmacySnapshot;
+  }
+
+  const allowed =
+    Boolean(token) &&
+    (role === "pharmacist" ||
+      role === "admin" ||
+      role === "hospital_admin" ||
+      role === "super_admin");
+
+  cachedPharmacyToken = token;
+  cachedPharmacyRole = role;
+  cachedPharmacySnapshot = { checked: true, allowed };
+  return cachedPharmacySnapshot;
+};
+
+const SERVER_PHARMACY_AUTH_SNAPSHOT = { checked: false, allowed: false };
+const readServerPharmacyAuthSnapshot = () => SERVER_PHARMACY_AUTH_SNAPSHOT;
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/pharmacy" },
@@ -14,20 +53,11 @@ const NAV_ITEMS = [
 export default function PharmacyLayout({ children }) {
   const router = useRouter();
 
-  const auth = useMemo(() => {
-    if (typeof window === "undefined") return { checked: false, allowed: false };
-    const token = localStorage.getItem("token");
-    const role = (localStorage.getItem("role") || "").toLowerCase();
-
-    const allowed =
-      Boolean(token) &&
-      (role === "pharmacist" ||
-        role === "admin" ||
-        role === "hospital_admin" ||
-        role === "super_admin");
-
-    return { checked: true, allowed };
-  }, []);
+  const auth = useSyncExternalStore(
+    subscribeToPharmacyAuthChanges,
+    readPharmacyAuthSnapshot,
+    readServerPharmacyAuthSnapshot
+  );
 
   useEffect(() => {
     if (auth.checked && !auth.allowed) router.push("/login");
